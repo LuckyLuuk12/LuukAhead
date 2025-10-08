@@ -1,10 +1,36 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 	import Layer from './Layer.svelte';
+	import WorkItemModal from './WorkItemModal.svelte';
 	export let node: any;
 	export let projectId: string;
 	export let types: any[] = [];
 	const dispatch = createEventDispatcher();
+	let modalOpen = false;
+	let modalItem: any = null;
+
+function clickFromInteractive(el: EventTarget | null) {
+	try {
+		const tgt = el as HTMLElement | null;
+		if (!tgt) return false;
+		return !!tgt.closest && !!tgt.closest('button, a, input, textarea, select, label');
+	} catch (e) {
+		return false;
+	}
+}
+
+function openModalOnCardClick(e: MouseEvent) {
+	if (clickFromInteractive(e.target)) return;
+	modalItem = node;
+	modalOpen = true;
+}
+
+function openModalOnKeypress(e: KeyboardEvent) {
+	if (e.key !== 'Enter') return;
+	if (clickFromInteractive(e.target)) return;
+	modalItem = node;
+	modalOpen = true;
+}
 
 	function hueForIndex(idx: number, count: number) {
 		if (count <= 1) return 270;
@@ -76,6 +102,7 @@
 
 	function typeNameForDepth(depth: number) {
 		// use types[depth] if available
+		if (depth >= types.length) return null;
 		return (types?.[depth]?.name ?? `Type ${depth + 1}`) + '(s)';
 	}
 
@@ -86,31 +113,35 @@
 
 <div class="stack">
 	<div class="layer layer-depth-{node.depth}">
-		<div class="card" style="border-color: {colorForDepth(node.depth)}">
-			<div style="display:flex; align-items:center; justify-content:space-between">
+			<div class="card" style="border-color: {colorForDepth(node.depth)}" on:click|stopPropagation={openModalOnCardClick} on:keypress|stopPropagation={openModalOnKeypress} tabindex="0" role="button" aria-label="Open item">
+				<div style="display:flex; align-items:center; justify-content:space-between">
 				<div>
 					<h3>{node.title}</h3>
-					<p>{node.description}</p>
+					<p>{node.priority?.name}</p>
 					<div class="badge">{typeNameForDepth(node.depth)}</div>
 				</div>
-				<div style="display:flex; gap:0.5rem; align-items:center">
+					<div style="display:flex; gap:0.5rem; align-items:center">
 					{#if node.is_root}
-						<button aria-label="Add first layer" on:click={addFirstLayer} title="Add first layer">＋</button>
+						<button aria-label="Add first layer" on:click|stopPropagation={addFirstLayer} title="Add first layer">＋</button>
 					{:else}
 						<!-- primary: add a nested child of next type if available -->
 						{#if types && types.length > node.depth}
-							<button aria-label="Add nested layer" on:click={addChild} title={`Add nested ${nextName}`}>
+							<button aria-label="Add nested layer" on:click|stopPropagation={addChild} title={`Add nested ${nextName}`}>
 								＋ {nextName}
 							</button>
 						{/if}
 						<!-- secondary: add a sibling (same type) -->
-						<button aria-label="Add sibling" on:click={addSibling} title={`Add ${myName} sibling`}>
+						<button aria-label="Add sibling" on:click|stopPropagation={addSibling} title={`Add ${myName} sibling`}>
 							＋ {myName}
 						</button>
 					{/if}
-					<button aria-label="Delete" on:click={deleteNode} title="Delete">🗑️</button>
+					<button aria-label="Delete" on:click|stopPropagation={deleteNode} title="Delete">🗑️</button>
+					<button aria-label="Open item" on:click|stopPropagation={() => { modalItem = node; modalOpen = true; }} title="Open item">🔍</button>
 				</div>
 			</div>
+
+			<!-- clicking the card opens the modal for this item (but inner buttons stopPropagation) -->
+			<WorkItemModal bind:open={modalOpen} item={modalItem} {projectId} on:saved={() => { dispatch('created'); modalOpen = false; }} />
 
 			{#if node.children?.length}
 				<div style="padding:0.5rem; margin-top:0.5rem">

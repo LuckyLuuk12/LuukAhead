@@ -15,7 +15,7 @@ export const PATCH: RequestHandler = async ({ params, request, cookies }) => {
   if (!projectId || !itemId) return new Response('Missing id', { status: 400 });
 
   const body = await request.json();
-  const allowed = ['parent_id', 'title', 'description', 'type_id', 'priority_id', 'remarks', 'deadline', 'owner_id', 'is_root'];
+  const allowed = ['parent_id', 'title', 'description', 'type_id', 'priority_id', 'remarks', 'deadline', 'owner_id', 'is_root', 'completed'];
   const toUpdate: any = {};
   for (const k of allowed) if (k in body) toUpdate[k] = (body as any)[k];
 

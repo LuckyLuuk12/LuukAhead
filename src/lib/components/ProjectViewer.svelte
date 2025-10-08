@@ -11,16 +11,19 @@
 		if (!projectId) return;
 		const res = await fetch(`/api/projects/${projectId}/work-items`);
 		if (res.ok) items = await res.json();
+		else console.error('failed to load items', res.status);
 	}
 
 	async function loadTypes() {
 		if (!projectId) return;
 		const res = await fetch(`/api/projects/${projectId}/item-types`);
 		if (res.ok) types = await res.json();
+		else console.error('failed to load types', res.status);
 	}
 
 	onMount(async () => {
-		await Promise.all([loadItems(), loadTypes()]);
+		await loadTypes();
+		await loadItems();
 	});
 
 	function buildTree(list: any[]) {

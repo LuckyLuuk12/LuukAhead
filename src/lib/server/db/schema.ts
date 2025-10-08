@@ -76,6 +76,8 @@ export const work_items = sqliteTable(`${table_prefix}work_items`, {
     owner_id: text('owner_id').references(() => user.id as any),
     // mark an item as the root item for a project (0/1 stored as integer)
     is_root: integer('is_root').default(0),
+    // mark whether the item is completed (0/1)
+    completed: integer('completed').default(0),
     created_at: integer('created_at', { mode: 'timestamp' })
         .notNull()
         .default(sql`(strftime('%s','now'))`),

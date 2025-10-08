@@ -18,8 +18,8 @@ export async function createProject(ownerId: string, name: string) {
 			const insertProject = sqliteClient.prepare(`INSERT INTO luukahead_project (id, name, owner_id, created_at) VALUES (?, ?, ?, ?)`);
 			insertProject.run(projectId, name, ownerId, nowSec);
 
-			const insertItem = sqliteClient.prepare(`INSERT INTO luukahead_work_items (id, project_id, parent_id, type_id, priority_id, title, description, remarks, deadline, owner_id, is_root, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-			insertItem.run(rootItemId, projectId, null, null, null, name, 'Project root', null, null, ownerId, 1, nowSec, nowSec);
+			const insertItem = sqliteClient.prepare(`INSERT INTO luukahead_work_items (id, project_id, parent_id, type_id, priority_id, title, description, remarks, deadline, owner_id, is_root, completed, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+			insertItem.run(rootItemId, projectId, null, null, null, name, 'Project root', null, null, ownerId, 1, 0, nowSec, nowSec);
 
 			const insertType = sqliteClient.prepare(`INSERT INTO luukahead_item_types (id, project_id, name, "order", color) VALUES (?, ?, ?, ?, ?)`);
 			for (let i = 0; i < defaultTypes.length; i++) {
@@ -38,7 +38,7 @@ export async function createProject(ownerId: string, name: string) {
 	} catch (e) {
 		// fallback: attempt to use drizzle inserts (not transactional here)
 		await db.insert(schema.project).values({ id: projectId, name, ownerId, createdAt: new Date() });
-		await db.insert(schema.work_items).values({ id: rootItemId, projectId, parent_id: null, type_id: null, priority_id: null, title: name, description: 'Project root', remarks: null, deadline: null, owner_id: ownerId, is_root: 1, created_at: new Date(), updated_at: new Date() });
+		await db.insert(schema.work_items).values({ id: rootItemId, projectId, parent_id: null, type_id: null, priority_id: null, title: name, description: 'Project root', remarks: null, deadline: null, owner_id: ownerId, is_root: 1, completed: 0, created_at: new Date(), updated_at: new Date() });
 
 		// insert defaults via drizzle
 		for (let i = 0; i < defaultTypes.length; i++) {

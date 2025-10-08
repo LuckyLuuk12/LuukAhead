@@ -1,3 +1,8 @@
+/**
+  * Kablan provides us with colors: primary, secondary, tertiary, quaternary, red, green, blue, cyan, yellow, magenta, light, dark 
+  * all with 50 to 900 shades. -500 is equal to normal color and 50 is the lightest, 900 the darkest.
+  * It also provides some default colors for background, container & card.
+  */
 @import '@kablan/clean-ui/css/index.css';
 
 body {

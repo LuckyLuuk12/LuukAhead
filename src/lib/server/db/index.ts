@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS luukahead_work_items (
 	deadline INTEGER,
 	owner_id TEXT,
 	is_root INTEGER DEFAULT 0,
+    completed INTEGER DEFAULT 0,
 	created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
 	updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
 	FOREIGN KEY(project_id) REFERENCES luukahead_project(id) ON DELETE CASCADE,
@@ -97,6 +98,23 @@ try {
 		// If initialization fails, log it but don't crash here; migrations are preferred for production.
 		// eslint-disable-next-line no-console
 		console.error('Failed to initialize database schema:', e);
+}
+
+// runtime migration: add `completed` column to work_items if it doesn't exist (local dev convenience)
+try {
+	const info = client.prepare(`PRAGMA table_info('luukahead_work_items')`).all();
+	const hasCompleted = info.some((r: any) => r.name === 'completed');
+	if (!hasCompleted) {
+		try {
+			client.prepare(`ALTER TABLE luukahead_work_items ADD COLUMN completed INTEGER DEFAULT 0`).run();
+			// eslint-disable-next-line no-console
+			console.log('Added completed column to luukahead_work_items');
+		} catch (e) {
+			// ignore if alter fails
+		}
+	}
+} catch (e) {
+	// ignore
 }
 
 export const db = drizzle(client, { schema });

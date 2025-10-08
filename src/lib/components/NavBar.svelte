@@ -6,7 +6,7 @@
 	onDestroy(unsub);
 </script>
 
-<nav style="display:flex; align-items:center; gap:1rem; padding:0.5rem 1rem; border-bottom:1px solid #eee">
+<nav style="display:flex; align-items:center; gap:1rem; padding:0.5rem 1rem; border-bottom:1px solid var(--primary)">
 	<div style="font-weight:700">LuukAhead</div>
 	<a href="/projects" class:active={current === '/projects'}>Projects</a>
 	<a href="/demo/lucia" class:active={current.startsWith('/demo')}>Demo</a>
