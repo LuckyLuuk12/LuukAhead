@@ -91,43 +91,200 @@
 	onMount(load);
 </script>
 
-<h1>Projects</h1>
-<div>
-	<input bind:value={name} placeholder="New project name" />
-	<button on:click={create}>Create</button>
+<div class="projects-page">
+	<div class="page-header">
+		<h1>Projects</h1>
+		<div class="create-project">
+			<input bind:value={name} placeholder="New project name" class="input-field" />
+			<button on:click={create} class="btn-primary">+ Create</button>
+		</div>
+	</div>
+
+	<div class="projects-container">
+		<div class="projects-list">
+			<h3>Your Projects</h3>
+			<ul>
+				{#each projects as p}
+					<li class:selected={selected === p.id}>
+						<input
+							value={edits[p.id]}
+							on:input={(e) => edits[p.id] = (e.target as HTMLInputElement).value}
+							on:blur={() => saveName(p.id)}
+							on:keydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+							class="project-name-input"
+						/>
+						<button on:click={() => (selected = p.id)} title="Open" class="btn-open">Open</button>
+						{#if saving[p.id]}
+							<span class="status saving">Saving…</span>
+						{:else if saved[p.id]}
+							<span class="status saved">✓</span>
+						{:else if errorMsg[p.id]}
+							<span class="status error">{errorMsg[p.id]}</span>
+						{/if}
+						<button on:click={() => deleteProject(p.id)} title="Delete project" class="btn-delete">🗑️</button>
+					</li>
+				{/each}
+			</ul>
+		</div>
+		<div class="project-content">
+			{#if selected}
+				<ProjectViewer projectId={selected} />
+			{:else}
+				<div class="empty-state">
+					<p>Select a project to view</p>
+				</div>
+			{/if}
+		</div>
+	</div>
 </div>
 
-<div style="display:flex; gap:1rem;">
-	<div style="width: fit-content; border-right:1px solid #eee; padding-right:1rem;">
-		<h3>Your projects</h3>
-		<ul>
-			{#each projects as p}
-				<li style="display:flex; align-items:center; gap:0.5rem;">
-					<input
-						value={edits[p.id]}
-						on:input={(e) => edits[p.id] = (e.target as HTMLInputElement).value}
-						on:blur={() => saveName(p.id)}
-						on:keydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-						style="width:160px"
-					/>
-					<button on:click={() => (selected = p.id)} title="Open" style="background:none;border:0;color:blue;cursor:pointer">Open</button>
-					{#if saving[p.id]}
-						<span style="color:gray">Saving…</span>
-					{:else if saved[p.id]}
-						<span style="color:green">✓</span>
-					{:else if errorMsg[p.id]}
-						<span style="color:crimson">{errorMsg[p.id]}</span>
-					{/if}
-					<button on:click={() => deleteProject(p.id)} title="Delete project" style="margin-left:auto">🗑️</button>
-				</li>
-			{/each}
-		</ul>
-	</div>
-	<div style="flex:1; padding-left:1rem;">
-		{#if selected}
-			<ProjectViewer projectId={selected} />
-		{:else}
-			<p>Select a project to view</p>
-		{/if}
-	</div>
-</div>
+<style>
+	.projects-page {
+		display: flex;
+		flex-direction: column;
+		height: 100%;
+		gap: 1rem;
+	}
+	.page-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding-bottom: 1rem;
+		border-bottom: 2px solid var(--primary-500);
+	}
+	.page-header h1 {
+		margin: 0;
+		color: var(--light-100);
+	}
+	.create-project {
+		display: flex;
+		gap: 0.5rem;
+	}
+	.input-field {
+		padding: 0.5rem 1rem;
+		border: 1px solid var(--dark-600);
+		border-radius: 6px;
+		background: var(--container);
+		color: var(--light-100);
+		min-width: 200px;
+	}
+	.btn-primary {
+		padding: 0.5rem 1.5rem;
+		background: var(--primary-500);
+		color: var(--light-50);
+		border: none;
+		border-radius: 6px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: background 0.2s;
+	}
+	.btn-primary:hover {
+		background: var(--primary-600);
+	}
+	.projects-container {
+		display: flex;
+		gap: 1.5rem;
+		flex: 1;
+		overflow: hidden;
+	}
+	.projects-list {
+		width: 320px;
+		background: var(--card);
+		border-radius: 8px;
+		padding: 1rem;
+		overflow-y: auto;
+		box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+	}
+	.projects-list h3 {
+		margin: 0 0 1rem 0;
+		color: var(--primary-400);
+		font-size: 1.1rem;
+	}
+	.projects-list ul {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+	}
+	.projects-list li {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.75rem;
+		margin-bottom: 0.5rem;
+		background: var(--container);
+		border-radius: 6px;
+		border: 1px solid var(--dark-700);
+		transition: all 0.2s;
+		max-width: 100%;
+	}
+	.projects-list li:hover {
+		border-color: var(--primary-600);
+	}
+	.projects-list li.selected {
+		border-color: var(--primary-500);
+		background: var(--primary-900);
+	}
+	.project-name-input {
+		padding: 0.25rem 0.5rem;
+		border: 1px solid var(--dark-700);
+		border-radius: 4px;
+		background: var(--background);
+		color: var(--light-100);
+		font-size: 0.95rem;
+		width: 100%;
+	}
+	.btn-open {
+		padding: 0.25rem 0.75rem;
+		background: var(--primary-700);
+		color: var(--light-100);
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 0.85rem;
+		transition: background 0.2s;
+	}
+	.btn-open:hover {
+		background: var(--primary-600);
+	}
+	.btn-delete {
+		padding: 0.25rem 0.5rem;
+		background: transparent;
+		border: none;
+		cursor: pointer;
+		font-size: 1.1rem;
+		opacity: 0.6;
+		transition: opacity 0.2s;
+	}
+	.btn-delete:hover {
+		opacity: 1;
+	}
+	.status {
+		font-size: 0.85rem;
+	}
+	.status.saving {
+		color: var(--light-400);
+	}
+	.status.saved {
+		color: var(--green-500);
+	}
+	.status.error {
+		color: var(--red-500);
+		font-size: 0.8rem;
+	}
+	.project-content {
+		flex: 1;
+		background: var(--card);
+		border-radius: 8px;
+		padding: 1rem;
+		overflow: auto;
+		box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+	}
+	.empty-state {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		height: 100%;
+		color: var(--light-400);
+		font-size: 1.1rem;
+	}
+</style>

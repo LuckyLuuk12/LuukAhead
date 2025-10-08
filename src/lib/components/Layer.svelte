@@ -111,40 +111,37 @@ function openModalOnKeypress(e: KeyboardEvent) {
 	$: myName = (types?.[node.depth - 1]?.name ?? 'item');
 </script>
 
-<div class="stack">
+<div class="layer-container">
 	<div class="layer layer-depth-{node.depth}">
-			<div class="card" style="border-color: {colorForDepth(node.depth)}" on:click|stopPropagation={openModalOnCardClick} on:keypress|stopPropagation={openModalOnKeypress} tabindex="0" role="button" aria-label="Open item">
-				<div style="display:flex; align-items:center; justify-content:space-between">
-				<div>
-					<h3>{node.title}</h3>
-					<p>{node.priority?.name}</p>
-					<div class="badge">{typeNameForDepth(node.depth)}</div>
+		<div class="card" style="border-left-color: {colorForDepth(node.depth)}" on:click|stopPropagation={openModalOnCardClick} on:keypress|stopPropagation={openModalOnKeypress} tabindex="0" role="button" aria-label="Open item">
+			<div class="card-header">
+				<div class="card-info">
+					<h3 class="card-title">{node.title}</h3>
+					{#if node.description}
+						<p class="card-desc">{node.description}</p>
+					{/if}
+					<div class="badge" style="background: {colorForDepth(node.depth)}20; color: {colorForDepth(node.depth)}">{typeNameForDepth(node.depth)}</div>
 				</div>
-					<div style="display:flex; gap:0.5rem; align-items:center">
+				<div class="card-actions">
 					{#if node.is_root}
-						<button aria-label="Add first layer" on:click|stopPropagation={addFirstLayer} title="Add first layer">＋</button>
+						<button class="btn-icon" aria-label="Add first layer" on:click|stopPropagation={addFirstLayer} title="Add first layer">＋</button>
 					{:else}
-						<!-- primary: add a nested child of next type if available -->
 						{#if types && types.length > node.depth}
-							<button aria-label="Add nested layer" on:click|stopPropagation={addChild} title={`Add nested ${nextName}`}>
+							<button class="btn-icon" aria-label="Add nested layer" on:click|stopPropagation={addChild} title={`Add nested ${nextName}`}>
 								＋ {nextName}
 							</button>
 						{/if}
-						<!-- secondary: add a sibling (same type) -->
-						<button aria-label="Add sibling" on:click|stopPropagation={addSibling} title={`Add ${myName} sibling`}>
+						<button class="btn-icon" aria-label="Add sibling" on:click|stopPropagation={addSibling} title={`Add ${myName} sibling`}>
 							＋ {myName}
 						</button>
 					{/if}
-					<button aria-label="Delete" on:click|stopPropagation={deleteNode} title="Delete">🗑️</button>
-					<button aria-label="Open item" on:click|stopPropagation={() => { modalItem = node; modalOpen = true; }} title="Open item">🔍</button>
+					<button class="btn-icon btn-danger" aria-label="Delete" on:click|stopPropagation={deleteNode} title="Delete">🗑️</button>
+					<button class="btn-icon btn-primary" aria-label="Open item" on:click|stopPropagation={() => { modalItem = node; modalOpen = true; }} title="Open item">🔍</button>
 				</div>
 			</div>
 
-			<!-- clicking the card opens the modal for this item (but inner buttons stopPropagation) -->
-			<WorkItemModal bind:open={modalOpen} item={modalItem} {projectId} on:saved={() => { dispatch('created'); modalOpen = false; }} />
-
 			{#if node.children?.length}
-				<div style="padding:0.5rem; margin-top:0.5rem">
+				<div class="children-container">
 					{#each node.children as child}
 						<Layer node={child} projectId={projectId} types={types} on:created={() => dispatch('created')} />
 					{/each}
@@ -152,12 +149,109 @@ function openModalOnKeypress(e: KeyboardEvent) {
 			{/if}
 		</div>
 	</div>
+	
+	<WorkItemModal bind:open={modalOpen} item={modalItem} {projectId} on:saved={() => { dispatch('created'); modalOpen = false; }} />
 </div>
 
 <style>
-	.stack { display:flex; gap:0.5rem; width: 100%; }
-	.layer { display:flex; gap:0.25rem; overflow-x:auto; padding:0.25rem; }
-	.layer-depth-0 { width: 100%; padding: 0.5rem; }
-	.card { min-width:100%; border:1px solid #ddd; padding:0.25rem }
-	.badge { display:inline-block; padding:2px 6px; border-radius:4px; margin-top:6px }
+	.layer-container {
+		width: 100%;
+		max-width: 450px;
+	}
+	.layer {
+		width: 100%;
+	}
+	.card {
+		background: var(--container);
+		border: 1px solid var(--dark-700);
+		border-left: 4px solid var(--primary-500);
+		border-radius: 8px;
+		padding: 1rem;
+		cursor: pointer;
+		transition: all 0.2s ease;
+		box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+	}
+	.card:hover {
+		box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+		transform: translateY(-2px);
+		border-color: var(--primary-500);
+	}
+	.layer-depth-0 .card {
+		background: var(--card);
+		border-left-width: 6px;
+	}
+	.card-header {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+	.card-info {
+		flex: 1;
+		min-width: 0;
+	}
+	.card-title {
+		margin: 0 0 0.25rem 0;
+		font-size: 1.1rem;
+		color: var(--light-100);
+		font-weight: 600;
+	}
+	.card-desc {
+		margin: 0 0 0.5rem 0;
+		color: var(--light-300);
+		font-size: 0.9rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		display: -webkit-box;
+		line-clamp: 2;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+	}
+	.badge {
+		display: inline-block;
+		padding: 0.25rem 0.5rem;
+		border-radius: 4px;
+		font-size: 0.75rem;
+		font-weight: 600;
+		text-transform: uppercase;
+	}
+	.card-actions {
+		display: flex;
+		gap: 0.25rem;
+		align-items: flex-start;
+		flex-wrap: wrap;
+	}
+	.btn-icon {
+		padding: 0.35rem 0.65rem;
+		background: var(--dark-700);
+		color: var(--light-200);
+		border: 1px solid var(--dark-600);
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 0.85rem;
+		transition: all 0.2s;
+		white-space: nowrap;
+	}
+	.btn-icon:hover {
+		background: var(--dark-600);
+		color: var(--light-50);
+	}
+	.btn-primary {
+		background: var(--primary-700);
+		border-color: var(--primary-600);
+	}
+	.btn-primary:hover {
+		background: var(--primary-600);
+	}
+	.btn-danger:hover {
+		background: var(--red-700);
+		border-color: var(--red-600);
+	}
+	.children-container {
+		margin-top: 1rem;
+		padding-top: 1rem;
+		border-top: 1px solid var(--dark-700);
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
 </style>

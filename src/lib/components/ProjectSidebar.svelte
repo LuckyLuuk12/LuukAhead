@@ -215,79 +215,224 @@
   }
 </script>
 
-<aside class="sidebar container">
-  <h4>Types</h4>
-  {#if !isReorderingTypes}
-    <ul>
-      {#each types as t, idx}
-        <li style="display:flex; gap:0.5rem; align-items:center">
-          <div style="flex:1">{t.name}</div>
-          <input type="color" value={t.color ?? computeTypeColor(idx, types.length)} on:input={(e) => updateTypeColor(t.id, (e.target as HTMLInputElement).value)} title="Pick color" />
-          <button on:click={() => deleteType(t.id)} title="Delete type">🗑️</button>
-        </li>
-      {/each}
-    </ul>
-    <div style="margin-top:0.5rem">
-      <button on:click={() => { draftTypes = types.slice(); isReorderingTypes = true; }}>Reorder types</button>
+<aside class="sidebar">
+  <div class="sidebar-section">
+    <h4>Item Types</h4>
+    {#if !isReorderingTypes}
+      <ul class="item-list">
+        {#each types as t, idx}
+          <li class="item">
+            <div class="item-color" style="background: {t.color ?? computeTypeColor(idx, types.length)}"></div>
+            <div class="item-name">{t.name}</div>
+            <input type="color" value={t.color ?? computeTypeColor(idx, types.length)} on:input={(e) => updateTypeColor(t.id, (e.target as HTMLInputElement).value)} title="Pick color" class="color-picker" />
+            <button on:click={() => deleteType(t.id)} title="Delete type" class="btn-delete">🗑️</button>
+          </li>
+        {/each}
+      </ul>
+      <button on:click={() => { draftTypes = types.slice(); isReorderingTypes = true; }} class="btn-secondary">Reorder</button>
+    {:else}
+      <p class="reorder-hint">Drag to reorder, then Confirm or Cancel</p>
+      <ul class="item-list reorderable">
+        {#each draftTypes as t, i}
+          <li class="item draggable" draggable="true" on:dragstart={(e) => onDragStart(e, i)} on:dragover={onDragOver} on:drop={(e) => onDropTypes(e, i)}>
+            <span class="drag-handle">⋮⋮</span>
+            <span class="item-name">{t.name}</span>
+            <span class="order-badge">#{i+1}</span>
+          </li>
+        {/each}
+      </ul>
+      <div class="button-group">
+        <button on:click={confirmReorderTypes} class="btn-primary">Confirm</button>
+        <button on:click={cancelReorderTypes} class="btn-secondary">Cancel</button>
+      </div>
+    {/if}
+    <div class="input-group">
+      <input bind:value={newTypeName} placeholder="New type name" class="input-field" />
+      <button on:click={createType} class="btn-add">+</button>
     </div>
-  {:else}
-    <p><em>Drag to reorder types, then Confirm or Cancel</em></p>
-    <ul>
-      {#each draftTypes as t, i}
-        <li draggable="true" on:dragstart={(e) => onDragStart(e, i)} on:dragover={onDragOver} on:drop={(e) => onDropTypes(e, i)}>
-          <span style="flex:1">{t.name}</span>
-          <span style="opacity:0.6; font-size:0.9em">#{i+1}</span>
-        </li>
-      {/each}
-    </ul>
-    <div style="margin-top:0.5rem">
-      <button on:click={confirmReorderTypes}>Confirm</button>
-      <button on:click={cancelReorderTypes} style="margin-left:0.5rem">Cancel</button>
-    </div>
-  {/if}
-  <div>
-    <input bind:value={newTypeName} placeholder="New type name" />
-    <button on:click={createType}>Add type</button>
   </div>
 
-  <h4>Priorities</h4>
-  {#if !isReorderingPriorities}
-    <ul>
-      {#each priorities as pr, idx}
-        <li style="display:flex; gap:0.5rem; align-items:center">
-          <div style="flex:1">{pr.name}</div>
-          <input type="color" value={pr.color ?? computePriorityColor(idx, priorities.length)} on:input={(e) => updatePriorityColor(pr.id, (e.target as HTMLInputElement).value)} title="Pick color" />
-          <button on:click={() => deletePriority(pr.id)} title="Delete priority">🗑️</button>
-        </li>
-      {/each}
-    </ul>
-    <div style="margin-top:0.5rem">
-      <button on:click={() => { draftPriorities = priorities.slice(); isReorderingPriorities = true; }}>Reorder priorities</button>
+  <div class="sidebar-section">
+    <h4>Priorities</h4>
+    {#if !isReorderingPriorities}
+      <ul class="item-list">
+        {#each priorities as pr, idx}
+          <li class="item">
+            <div class="item-color" style="background: {pr.color ?? computePriorityColor(idx, priorities.length)}"></div>
+            <div class="item-name">{pr.name}</div>
+            <input type="color" value={pr.color ?? computePriorityColor(idx, priorities.length)} on:input={(e) => updatePriorityColor(pr.id, (e.target as HTMLInputElement).value)} title="Pick color" class="color-picker" />
+            <button on:click={() => deletePriority(pr.id)} title="Delete priority" class="btn-delete">🗑️</button>
+          </li>
+        {/each}
+      </ul>
+      <button on:click={() => { draftPriorities = priorities.slice(); isReorderingPriorities = true; }} class="btn-secondary">Reorder</button>
+    {:else}
+      <p class="reorder-hint">Drag to reorder, then Confirm or Cancel</p>
+      <ul class="item-list reorderable">
+        {#each draftPriorities as p, i}
+          <li class="item draggable" draggable="true" on:dragstart={(e) => onDragStart(e, i)} on:dragover={onDragOver} on:drop={(e) => onDropPriorities(e, i)}>
+            <span class="drag-handle">⋮⋮</span>
+            <span class="item-name">{p.name}</span>
+            <span class="order-badge">#{i+1}</span>
+          </li>
+        {/each}
+      </ul>
+      <div class="button-group">
+        <button on:click={confirmReorderPriorities} class="btn-primary">Confirm</button>
+        <button on:click={cancelReorderPriorities} class="btn-secondary">Cancel</button>
+      </div>
+    {/if}
+    <div class="input-group">
+      <input bind:value={newPriorityName} placeholder="New priority name" class="input-field" />
+      <button on:click={createPriority} class="btn-add">+</button>
     </div>
-  {:else}
-    <p><em>Drag to reorder priorities, then Confirm or Cancel</em></p>
-    <ul>
-      {#each draftPriorities as p, i}
-        <li draggable="true" on:dragstart={(e) => onDragStart(e, i)} on:dragover={onDragOver} on:drop={(e) => onDropPriorities(e, i)}>
-          <span style="flex:1">{p.name}</span>
-          <span style="opacity:0.6; font-size:0.9em">#{i+1}</span>
-        </li>
-      {/each}
-    </ul>
-    <div style="margin-top:0.5rem">
-      <button on:click={confirmReorderPriorities}>Confirm</button>
-      <button on:click={cancelReorderPriorities} style="margin-left:0.5rem">Cancel</button>
-    </div>
-  {/if}
-  <div>
-    <input bind:value={newPriorityName} placeholder="New priority name" />
-    <button on:click={createPriority}>Add priority</button>
   </div>
 </aside>
 
 <style>
-  .sidebar { width:260px; padding:1rem; position:absolute; right: 0; }
-  .sidebar ul { list-style:none; padding:0; margin:0 0 0.5rem 0 }
-  .sidebar li { display:flex; justify-content:space-between; align-items:center; padding:0.25rem 0 }
-  .sidebar input { width:100%; margin-top:0.5rem }
+  .sidebar {
+    width: 300px;
+    background: var(--card);
+    border-radius: 8px;
+    padding: 1rem;
+    overflow-y: auto;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .sidebar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .sidebar h4 {
+    margin: 0;
+    color: var(--primary-400);
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .item-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: var(--container);
+    border: 1px solid var(--dark-700);
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+  .item:hover {
+    border-color: var(--primary-600);
+  }
+  .item-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .item-name {
+    flex: 1;
+    color: var(--light-200);
+    font-size: 0.9rem;
+  }
+  .color-picker {
+    width: 32px;
+    height: 24px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .btn-delete {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    padding: 0.25rem;
+  }
+  .btn-delete:hover {
+    opacity: 1;
+  }
+  .btn-primary {
+    padding: 0.5rem 1rem;
+    background: var(--primary-500);
+    color: var(--light-50);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.2s;
+  }
+  .btn-primary:hover {
+    background: var(--primary-600);
+  }
+  .btn-secondary {
+    padding: 0.5rem 1rem;
+    background: var(--dark-700);
+    color: var(--light-200);
+    border: 1px solid var(--dark-600);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-secondary:hover {
+    background: var(--dark-600);
+  }
+  .input-group {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .input-field {
+    flex: 1;
+    padding: 0.5rem;
+    background: var(--container);
+    border: 1px solid var(--dark-700);
+    border-radius: 4px;
+    color: var(--light-100);
+    font-size: 0.9rem;
+  }
+  .btn-add {
+    padding: 0.5rem 1rem;
+    background: var(--primary-500);
+    color: var(--light-50);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1.1rem;
+    transition: background 0.2s;
+  }
+  .btn-add:hover {
+    background: var(--primary-600);
+  }
+  .reorder-hint {
+    font-size: 0.85rem;
+    color: var(--light-400);
+    font-style: italic;
+    margin: 0;
+  }
+  .draggable {
+    cursor: move;
+  }
+  .drag-handle {
+    color: var(--light-500);
+    font-size: 1rem;
+  }
+  .order-badge {
+    font-size: 0.8rem;
+    color: var(--light-500);
+  }
+  .button-group {
+    display: flex;
+    gap: 0.5rem;
+  }
 </style>

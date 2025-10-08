@@ -186,8 +186,4 @@ function escapeHtml(str: string) {
   .actions { display:flex; gap:0.5rem; justify-content:flex-end; margin-top:0.5rem }
   /* markdown content styles */
   .desc, .remarks div { font-size:0.95rem; line-height:1.5 }
-  .desc h1, .desc h2, .desc h3, .remarks h1, .remarks h2, .remarks h3 { margin:0.5rem 0 }
-  .desc pre, .remarks pre { background: #0b1220; color: #e6eef6; padding:0.75rem; border-radius:6px; overflow:auto }
-  .desc code, .remarks code { background: rgba(0,0,0,0.08); padding:0.15rem 0.3rem; border-radius:4px }
-  .desc a { color: var(--link, #52a0ff) }
 </style>

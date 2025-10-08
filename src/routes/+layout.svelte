@@ -10,15 +10,24 @@
 	<title>LuukAhead</title>
 </svelte:head>
 
-<NavBar />
-<main style="padding:1rem">
-	<slot />
-</main>
+<div class="app-container">
+	<NavBar />
+	<main>
+		<slot />
+	</main>
+</div>
 
 <style>
-	main {
-		width: 100%;
-		max-width: 100vw;
+	.app-container {
+		display: flex;
+		flex-direction: column;
+		height: 100vh;
 		overflow: hidden;
+		background: var(--background);
+	}
+	main {
+		flex: 1;
+		overflow: auto;
+		padding: 1.5rem;
 	}
 </style>

@@ -63,7 +63,7 @@
 <div class="project-viewer-wrap">
 	<div class="project-viewer">
 		{#if tree.length === 0}
-			<div style="padding:1rem">No items yet — create a project or add a root item</div>
+			<div class="empty-message">No items yet — add items using the sidebar</div>
 		{:else}
 			{#if rootNode}
 				<Layer node={rootNode} projectId={projectId} types={types} on:created={() => loadItems()} />
@@ -74,7 +74,26 @@
 </div>
 
 <style>
-	.project-viewer-wrap { display:flex; gap:1rem; align-items:flex-start; width:100%; }
-	.project-viewer { display:flex; flex-wrap:wrap; gap:1rem; width:100%; }
+	.project-viewer-wrap {
+		display: flex;
+		gap: 1.5rem;
+		height: 100%;
+		overflow: hidden;
+		position: relative;
+	}
+	.project-viewer {
+		flex: 1;
+		display: flex;
+		flex-wrap: wrap;
+		align-content: flex-start;
+		gap: 1rem;
+		overflow-y: auto;
+		padding: 0.5rem;
+	}
+	.empty-message {
+		padding: 2rem;
+		color: var(--light-400);
+		font-size: 1rem;
+	}
 </style>
 
