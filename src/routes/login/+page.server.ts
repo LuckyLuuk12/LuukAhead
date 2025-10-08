@@ -1,4 +1,4 @@
-import { hash, verify } from '@node-rs/argon2';
+import argon2 from 'argon2-browser';
 import { encodeBase32LowerCase } from '@oslojs/encoding';
 import { fail, redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
@@ -37,11 +37,9 @@ export const actions: Actions = {
             return fail(400, { message: 'Incorrect username or password' });
         }
 
-        const validPassword = await verify(existingUser.passwordHash, password, {
-            memoryCost: 19456,
-            timeCost: 2,
-            outputLen: 32,
-            parallelism: 1,
+        const validPassword = await argon2.verify({
+            pass: password,
+            encoded: existingUser.passwordHash
         });
         if (!validPassword) {
             return fail(400, { message: 'Incorrect username or password' });
@@ -66,15 +64,18 @@ export const actions: Actions = {
         }
 
         const userId = generateUserId();
-        const passwordHash = await hash(password, {
-            memoryCost: 19456,
-            timeCost: 2,
-            outputLen: 32,
+        const passwordHash = await argon2.hash({
+            pass: password,
+            salt: crypto.getRandomValues(new Uint8Array(16)),
+            time: 2,
+            mem: 19456,
+            hashLen: 32,
             parallelism: 1,
+            type: argon2.ArgonType.Argon2id
         });
 
         try {
-            await db.insert(table.user).values({ id: userId, username, passwordHash });
+            await db.insert(table.user).values({ id: userId, username, passwordHash: passwordHash.encoded });
 
             const sessionToken = auth.generateSessionToken();
             const session = await auth.createSession(sessionToken, userId);
