@@ -23,13 +23,13 @@ export async function createProject(ownerId: string, name: string) {
 
 			const insertType = sqliteClient.prepare(`INSERT INTO luukahead_item_types (id, project_id, name, "order", color) VALUES (?, ?, ?, ?, ?)`);
 			for (let i = 0; i < defaultTypes.length; i++) {
-				const tid = require('uuid').v4();
+				const tid = uuidv4();
 				insertType.run(tid, projectId, defaultTypes[i], i, null);
 			}
 
 			const insertPrio = sqliteClient.prepare(`INSERT INTO luukahead_priorities (id, project_id, name, "order", color) VALUES (?, ?, ?, ?, ?)`);
 			for (let i = 0; i < defaultPriorities.length; i++) {
-				const pid = require('uuid').v4();
+				const pid = uuidv4();
 				insertPrio.run(pid, projectId, defaultPriorities[i], i, null);
 			}
 		});
@@ -42,10 +42,10 @@ export async function createProject(ownerId: string, name: string) {
 
 		// insert defaults via drizzle
 		for (let i = 0; i < defaultTypes.length; i++) {
-			await db.insert(schema.item_types).values({ id: require('uuid').v4(), projectId, name: defaultTypes[i], order: i, color: null });
+			await db.insert(schema.item_types).values({ id: uuidv4(), projectId, name: defaultTypes[i], order: i, color: null });
 		}
 		for (let i = 0; i < defaultPriorities.length; i++) {
-			await db.insert(schema.priorities).values({ id: require('uuid').v4(), projectId, name: defaultPriorities[i], order: i, color: null });
+			await db.insert(schema.priorities).values({ id: uuidv4(), projectId, name: defaultPriorities[i], order: i, color: null });
 		}
 
 		return { projectId, rootItemId };

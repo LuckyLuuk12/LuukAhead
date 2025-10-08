@@ -71,7 +71,7 @@
 </div>
 
 <style>
-	.project-viewer-wrap { display:flex; gap:1rem; align-items:flex-start; }
-	.project-viewer { display:flex; flex-wrap:wrap; gap:1rem; max-width:1200px; }
+	.project-viewer-wrap { display:flex; gap:1rem; align-items:flex-start; width:100%; }
+	.project-viewer { display:flex; flex-wrap:wrap; gap:1rem; width:100%; }
 </style>
 

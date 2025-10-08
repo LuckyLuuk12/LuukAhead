@@ -19,26 +19,30 @@
 	}
 
 	function colorForDepth(depth: number) {
-		const t = types?.[depth];
+		// node depth: 0 = project root (no type), 1 = first type, etc.
+		const typeIdx = Math.max(0, depth - 1);
+		// root should have a neutral border
+		if (depth === 0) return 'var(--dark-700, #fff)';
+		const t = types?.[typeIdx];
 		if (t?.color) return t.color;
 		const count = Math.max(1, types?.length || 1);
-		return toHslString(hueForIndex(depth, count));
+		return toHslString(hueForIndex(typeIdx, count));
 	}
 
-	// Add a sibling item (same type) under the same parent as this node
+// Add a sibling item (same type) under the same parent as this node
 	async function addSibling() {
 		// root has no siblings
 		if (node.is_root) return;
-		const myType = types?.[node.depth];
-		const res = await fetch(`/api/projects/${projectId}/work-items`, {
-			method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parent_id: node.parent_id ?? null, title: 'New item', type_id: myType?.id ?? null })
-		});
+	const myType = types?.[node.depth - 1];
+	const res = await fetch(`/api/projects/${projectId}/work-items`, {
+		method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parent_id: node.parent_id ?? null, title: 'New item', type_id: myType?.id ?? null })
+	});
 		if (res.ok) dispatch('created'); else console.error('Failed to create sibling', await res.text());
 	}
 
-	// Add a nested child of the next type (e.g., Feature inside Epic)
+	// Add a nested child of the next type (the type index equals node.depth)
 	async function addChild() {
-		const nextType = types?.[node.depth + 1];
+		const nextType = types?.[node.depth];
 		const res = await fetch(`/api/projects/${projectId}/work-items`, {
 			method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parent_id: node.id, title: 'New item', type_id: nextType?.id ?? null })
 		});
@@ -72,12 +76,16 @@
 
 	function typeNameForDepth(depth: number) {
 		// use types[depth] if available
-		return types?.[depth]?.name ?? `Type ${depth + 1}`;
+		return (types?.[depth]?.name ?? `Type ${depth + 1}`) + '(s)';
 	}
+
+	// derived names for markup
+	$: nextName = (types?.[node.depth]?.name ?? 'layer');
+	$: myName = (types?.[node.depth - 1]?.name ?? 'item');
 </script>
 
 <div class="stack">
-	<div class="layer">
+	<div class="layer layer-depth-{node.depth}">
 		<div class="card" style="border-color: {colorForDepth(node.depth)}">
 			<div style="display:flex; align-items:center; justify-content:space-between">
 				<div>
@@ -89,12 +97,16 @@
 					{#if node.is_root}
 						<button aria-label="Add first layer" on:click={addFirstLayer} title="Add first layer">＋</button>
 					{:else}
-						<!-- add a sibling (same type) -->
-						<button aria-label="Add sibling" on:click={addSibling} title="Add item of same type">＋</button>
-						<!-- add a nested child of next type if available -->
-						{#if types && types.length > (node.depth + 1)}
-							<button aria-label="Add child layer" on:click={addChild} title="Add nested layer">＋ layer</button>
+						<!-- primary: add a nested child of next type if available -->
+						{#if types && types.length > node.depth}
+							<button aria-label="Add nested layer" on:click={addChild} title={`Add nested ${nextName}`}>
+								＋ {nextName}
+							</button>
 						{/if}
+						<!-- secondary: add a sibling (same type) -->
+						<button aria-label="Add sibling" on:click={addSibling} title={`Add ${myName} sibling`}>
+							＋ {myName}
+						</button>
 					{/if}
 					<button aria-label="Delete" on:click={deleteNode} title="Delete">🗑️</button>
 				</div>
@@ -112,7 +124,9 @@
 </div>
 
 <style>
-	.layer { display:flex; gap:1rem; overflow-x:auto; padding:0.5rem }
-	.card { min-width:220px; border:1px solid #ddd; padding:0.5rem }
+	.stack { display:flex; gap:0.5rem; width: 100%; }
+	.layer { display:flex; gap:0.25rem; overflow-x:auto; padding:0.25rem; }
+	.layer-depth-0 { width: 100%; padding: 0.5rem; }
+	.card { min-width:100%; border:1px solid #ddd; padding:0.25rem }
 	.badge { display:inline-block; padding:2px 6px; border-radius:4px; margin-top:6px }
 </style>
