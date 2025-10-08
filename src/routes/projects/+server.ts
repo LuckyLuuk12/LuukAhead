@@ -1,0 +1,18 @@
+import type { RequestHandler } from './$types';
+import { createProject } from '$lib/server/db/projects';
+import { validateSessionToken } from '$lib/server/auth';
+
+export const POST: RequestHandler = async ({ request, cookies }) => {
+	const body = await request.json();
+	const { name } = body;
+	if (!name) return new Response('Missing name', { status: 400 });
+
+	const token = cookies.get('auth-session');
+	if (!token) return new Response('Unauthorized', { status: 401 });
+
+	const { session, user } = await validateSessionToken(token);
+	if (!session || !user) return new Response('Unauthorized', { status: 401 });
+
+	const res = await createProject(user.id, name);
+	return new Response(JSON.stringify(res), { status: 201 });
+};

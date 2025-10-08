@@ -1,0 +1,21 @@
+name = "luukahead"
+main = "./.svelte-kit/cloudflare-workers/index.js"
+compatibility_flags = [ "nodejs_compat" ]
+compatibility_date = "2025-06-23"
+
+# no clue what this does but replaces: site = { bucket = "./static" }
+[assets]
+binding = "ASSETS"
+directory = ".svelte-kit/cloudflare"
+
+# Ensures we have a binding to a D1 database
+[[d1_databases]]
+binding = "DB"
+database_name = "kablan_db"
+database_id = "01ca3af7-978a-4258-9ad1-37ae8f060510"
+migrations_dir = "./drizzle"
+
+# Enables Logging for the worker
+[observability]
+enabled = true
+head_sampling_rate = 1 # optional. default = 1.

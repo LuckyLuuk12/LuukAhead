@@ -1,0 +1,45 @@
+{
+	"name": "luukahead",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"cf-dev": "(vite build || shx echo skipped) && drizzle-kit generate && drizzle-kit push && (npx wrangler d1 migrations apply DB || shx echo skipped) && npx wrangler d1 execute DB --command \"SELECT name FROM sqlite_master WHERE type='table';\" && npx wrangler dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"db:push": "drizzle-kit push",
+		"db:generate": "drizzle-kit generate",
+		"db:migrate": "drizzle-kit migrate",
+		"db:studio": "drizzle-kit studio"
+	},
+	"devDependencies": {
+		"@oslojs/crypto": "^1.0.1",
+		"@oslojs/encoding": "^1.1.0",
+		"@sveltejs/adapter-cloudflare": "^7.2.4",
+		"@sveltejs/kit": "^2.43.2",
+		"@sveltejs/vite-plugin-svelte": "^6.2.0",
+		"@types/better-sqlite3": "^7.6.13",
+		"@types/node": "^22",
+		"@types/uuid": "^10.0.0",
+		"drizzle-kit": "^0.31.4",
+		"drizzle-orm": "^0.44.5",
+		"sass": "^1.71.0",
+		"sass-embedded": "^1.89.2",
+		"shx": "^0.4.0",
+		"svelte": "^5.39.5",
+		"svelte-check": "^4.3.2",
+		"typescript": "^5.9.2",
+		"vite": "^7.1.7"
+	},
+	"dependencies": {
+		"@kablan/clean-ui": "1.0.9",
+		"@node-rs/argon2": "^2.0.2",
+		"better-sqlite3": "^12.4.1",
+		"uuid": "^9.0.0",
+		"wrangler": "^4.42.1"
+	}
+}
