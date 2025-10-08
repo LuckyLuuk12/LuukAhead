@@ -114,9 +114,17 @@ function escapeHtml(str: string) {
   function onClose() {
     open = false;
   }
+
+  function onDialogClick(e: MouseEvent) {
+    // Close if clicking on the backdrop (the dialog element itself, not its content)
+    if (e.target === dlg) {
+      e.stopPropagation();
+      open = false;
+    }
+  }
 </script>
 
-<dialog bind:this={dlg} class="workitem-dialog" on:close={onClose}>
+<dialog bind:this={dlg} class="workitem-dialog" on:close={onClose} on:click={onDialogClick}>
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
   <form method="dialog" class="modal-form" on:click|stopPropagation>
     <div class="view-header">

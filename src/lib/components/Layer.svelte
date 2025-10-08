@@ -90,8 +90,8 @@ function openModalOnKeypress(e: KeyboardEvent) {
 		if (res.ok) dispatch('created'); else console.error('Failed to create child', await res.text());
 	}
 
-	async function deleteNode() {
-		if (!confirm('Remove this item and its children?')) return;
+	async function deleteNode(e: MouseEvent) {
+		if (!e.shiftKey && !confirm('Remove this item and its children?')) return;
 		const res = await fetch(`/api/projects/${projectId}/work-items/${node.id}`, { method: 'DELETE' });
 		if (res.ok) dispatch('created'); else console.error('Failed delete', await res.text());
 	}
@@ -116,9 +116,12 @@ function openModalOnKeypress(e: KeyboardEvent) {
 	}
 
 	function typeNameForDepth(depth: number) {
-		// use types[depth] if available
-		if (depth >= types.length) return null;
-		return (types?.[depth]?.name ?? `Type ${depth + 1}`) + '(s)';
+		// Show the type of this node, not its children
+		// depth 0 = project root (no type shown), depth 1 = first type, etc.
+		if (depth === 0) return 'Project Root';
+		const typeIdx = depth - 1;
+		if (typeIdx >= types.length) return null;
+		return types?.[typeIdx]?.name ?? `Type ${depth}`;
 	}
 
 	// derived names for markup
@@ -126,13 +129,13 @@ function openModalOnKeypress(e: KeyboardEvent) {
 	$: myName = (types?.[node.depth - 1]?.name ?? 'item');
 </script>
 
-<div class="layer-container">
+<div class="layer-container" class:tree-mode={!standalone}>
 	<div class="layer layer-depth-{node.depth}">
-		<div class="card" style="border-left-color: {colorForDepth(node.depth)}" on:click|stopPropagation={openModalOnCardClick} on:keypress|stopPropagation={openModalOnKeypress} tabindex="0" role="button" aria-label="Open item">
+		<div class="card" style="--layer-color: {colorForDepth(node.depth)}; border-left-color: var(--layer-color)" on:click|stopPropagation={openModalOnCardClick} on:keypress|stopPropagation={openModalOnKeypress} tabindex="0" role="button" aria-label="Open item">
 			<div class="card-header">
 				<div class="card-info">
 					<h3 class="card-title">{node.title}</h3>
-					<div class="badge" style="background: {colorForDepth(node.depth)}20; color: {colorForDepth(node.depth)}">{typeNameForDepth(node.depth)}</div>
+					<div class="badge" style="background: var(--layer-color, {colorForDepth(node.depth)})20; color: var(--layer-color, {colorForDepth(node.depth)})">{typeNameForDepth(node.depth)}</div>
 				</div>
 				<div class="card-actions">
 					{#if hasChildren}
@@ -142,20 +145,12 @@ function openModalOnKeypress(e: KeyboardEvent) {
 							</button>
 						{/if}
 					{/if}
-					{#if node.is_root}
-						<button class="btn-icon" aria-label="Add first layer" on:click|stopPropagation={addFirstLayer} title="Add first layer">＋</button>
-					{:else}
-						{#if types && types.length > node.depth}
-							<button class="btn-icon" aria-label="Add nested layer" on:click|stopPropagation={addChild} title={`Add nested ${nextName}`}>
-								＋ {nextName}
-							</button>
-						{/if}
-						<button class="btn-icon" aria-label="Add sibling" on:click|stopPropagation={addSibling} title={`Add ${myName} sibling`}>
-							＋ {myName}
+					{#if types && types.length > node.depth}
+						<button class="btn-icon" aria-label="Add nested layer" on:click|stopPropagation={addChild} title={`Add ${nextName}`}>
+							＋ {nextName}
 						</button>
 					{/if}
-					<button class="btn-icon btn-danger" aria-label="Delete" on:click|stopPropagation={deleteNode} title="Delete">🗑️</button>
-					<button class="btn-icon btn-primary" aria-label="Open item" on:click|stopPropagation={() => { modalItem = node; modalOpen = true; }} title="Open item">🔍</button>
+					<button class="btn-icon btn-danger" aria-label="Delete" on:click|stopPropagation={deleteNode} title="Delete (Shift+Click to skip confirmation)">🗑️</button>
 				</div>
 			</div>
 
@@ -178,6 +173,9 @@ function openModalOnKeypress(e: KeyboardEvent) {
 		max-width: 450px;
 		flex-shrink: 0;
 	}
+	.layer-container.tree-mode {
+		max-width: none;
+	}
 	.layer {
 		width: 100%;
 	}
@@ -194,7 +192,7 @@ function openModalOnKeypress(e: KeyboardEvent) {
 	.card:hover {
 		box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 		transform: translateY(-2px);
-		border-color: var(--primary-500);
+		border-color: var(--layer-color);
 	}
 	.layer-depth-0 .card {
 		background: var(--card);

@@ -1,7 +1,10 @@
 <script lang="ts">
 	import '$lib/styles/global.scss';
-	import favicon from '$lib/assets/favicon.svg';
+	import favicon from '$lib/assets/favicon.png';
 	import NavBar from '$lib/components/NavBar.svelte';
+	import type { LayoutData } from './$types';
+
+	export let data: LayoutData;
 </script>
 
 <svelte:head>
@@ -11,7 +14,7 @@
 </svelte:head>
 
 <div class="app-container">
-	<NavBar />
+	<NavBar user={data.user} />
 	<main>
 		<slot />
 	</main>
