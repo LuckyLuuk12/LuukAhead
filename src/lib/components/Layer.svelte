@@ -1,13 +1,28 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
-	import Layer from './Layer.svelte';
 	import WorkItemModal from './WorkItemModal.svelte';
 	export let node: any;
 	export let projectId: string;
 	export let types: any[] = [];
+	export let viewMode: 'tree' | 'pyramid' = 'tree';
+	export let expandedNodes: Set<string> = new Set();
+	export let standalone: boolean = false; // In pyramid mode, don't render children
+	
 	const dispatch = createEventDispatcher();
 	let modalOpen = false;
 	let modalItem: any = null;
+
+	// In tree mode, show children only if expanded. In pyramid standalone mode, never show them (parent handles it)
+	$: showChildren = !standalone && expandedNodes.has(node.id);
+	
+	// Show expand button if node has children
+	$: hasChildren = node.children && node.children.length > 0;
+	$: isExpanded = expandedNodes.has(node.id);
+
+	function toggleExpandCollapse(e: MouseEvent) {
+		e.stopPropagation();
+		dispatch('toggle', node.id);
+	}
 
 function clickFromInteractive(el: EventTarget | null) {
 	try {
@@ -117,12 +132,16 @@ function openModalOnKeypress(e: KeyboardEvent) {
 			<div class="card-header">
 				<div class="card-info">
 					<h3 class="card-title">{node.title}</h3>
-					{#if node.description}
-						<p class="card-desc">{node.description}</p>
-					{/if}
 					<div class="badge" style="background: {colorForDepth(node.depth)}20; color: {colorForDepth(node.depth)}">{typeNameForDepth(node.depth)}</div>
 				</div>
 				<div class="card-actions">
+					{#if hasChildren}
+						{#if standalone || !node.is_root}
+							<button class="btn-icon btn-expand" aria-label="Toggle expand" on:click|stopPropagation={toggleExpandCollapse} title={isExpanded ? 'Collapse' : 'Expand'}>
+								{isExpanded ? '▼' : '▶'}
+							</button>
+						{/if}
+					{/if}
 					{#if node.is_root}
 						<button class="btn-icon" aria-label="Add first layer" on:click|stopPropagation={addFirstLayer} title="Add first layer">＋</button>
 					{:else}
@@ -140,10 +159,10 @@ function openModalOnKeypress(e: KeyboardEvent) {
 				</div>
 			</div>
 
-			{#if node.children?.length}
+			{#if showChildren && node.children?.length}
 				<div class="children-container">
 					{#each node.children as child}
-						<Layer node={child} projectId={projectId} types={types} on:created={() => dispatch('created')} />
+						<svelte:self node={child} {projectId} {types} {viewMode} {expandedNodes} {standalone} on:created on:toggle />
 					{/each}
 				</div>
 			{/if}
@@ -157,6 +176,7 @@ function openModalOnKeypress(e: KeyboardEvent) {
 	.layer-container {
 		width: 100%;
 		max-width: 450px;
+		flex-shrink: 0;
 	}
 	.layer {
 		width: 100%;
@@ -241,6 +261,15 @@ function openModalOnKeypress(e: KeyboardEvent) {
 	}
 	.btn-primary:hover {
 		background: var(--primary-600);
+	}
+	.btn-expand {
+		background: var(--dark-600);
+		border-color: var(--dark-500);
+		min-width: 2rem;
+		font-size: 0.75rem;
+	}
+	.btn-expand:hover {
+		background: var(--dark-500);
 	}
 	.btn-danger:hover {
 		background: var(--red-700);
