@@ -1,40 +1,81 @@
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import Database from 'better-sqlite3';
+// This version works for Cloudflare Workers/D1 using Drizzle's D1 driver.
+// You must provide the D1 binding (e.g., from the platform/env object in SvelteKit endpoints).
+
+import { drizzle } from 'drizzle-orm/d1';
+import type { D1Database } from '@cloudflare/workers-types';
 import * as schema from './schema';
-import { env } from '$env/dynamic/private';
 
-if (!env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
+export { drizzle };
+export type { D1Database };
 
-const client = new Database(env.DATABASE_URL);
-// expose the raw client for low-level operations that need better-sqlite3 transaction helper
-export const sqliteClient = client;
+/**
+ * When needing a db instance in a SvelteKit endpoint or action,
+ * you can use this function to get a Drizzle instance connected to the D1 database.
+ * ```
+ * const db = database(event);
+ * ```
+ */
+export const database = async (event: any) => {
+	const d1 = (event.platform as { env: { DB: D1Database; DEV_DB_AUTOCREATE?: string } }).env.DB;
+	const db = drizzle(d1, { schema });
 
-// Enable foreign keys in SQLite
-try {
-		client.pragma('foreign_keys = ON');
-} catch (e) {
-		// ignore
-}
+	const isDev = event.platform?.env?.DEV_DB_AUTOCREATE === 'true';
 
-// Ensure tables exist (simple runtime initialization for local development).
-// For production / Cloudflare D1 you should use proper migrations (drizzle-kit) instead.
-const initSql = `
-PRAGMA foreign_keys = ON;
+	if (isDev) {
+		// Use D1 binding directly for raw SQL to check and create tables
+		const tablesRes = await d1
+			.prepare(
+				`SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'luukahead_%';`
+			)
+			.all();
+		const foundTables = new Set(tablesRes.results?.map((row: any) => row.name));
 
+		// Create tables if they don't exist
+		if (!foundTables.has('luukahead_user')) {
+			await d1.batch([d1.prepare(CREATE_USER_TABLE_SQL)]);
+		}
+		if (!foundTables.has('luukahead_session')) {
+			await d1.batch([d1.prepare(CREATE_SESSION_TABLE_SQL)]);
+		}
+		if (!foundTables.has('luukahead_project')) {
+			await d1.batch([d1.prepare(CREATE_PROJECT_TABLE_SQL)]);
+		}
+		if (!foundTables.has('luukahead_item_types')) {
+			await d1.batch([d1.prepare(CREATE_ITEM_TYPES_TABLE_SQL)]);
+		}
+		if (!foundTables.has('luukahead_priorities')) {
+			await d1.batch([d1.prepare(CREATE_PRIORITIES_TABLE_SQL)]);
+		}
+		if (!foundTables.has('luukahead_work_items')) {
+			await d1.batch([d1.prepare(CREATE_WORK_ITEMS_TABLE_SQL)]);
+		}
+		if (!foundTables.has('luukahead_work_item_visibility')) {
+			await d1.batch([d1.prepare(CREATE_WORK_ITEM_VISIBILITY_TABLE_SQL)]);
+		}
+	}
+
+	return { db, d1 };
+};
+
+const CREATE_USER_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS luukahead_user (
 	id TEXT PRIMARY KEY,
 	age INTEGER,
 	username TEXT NOT NULL UNIQUE,
 	password_hash TEXT NOT NULL
 );
+`;
 
+const CREATE_SESSION_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS luukahead_session (
 	id TEXT PRIMARY KEY,
 	user_id TEXT NOT NULL,
 	expires_at INTEGER NOT NULL,
 	FOREIGN KEY(user_id) REFERENCES luukahead_user(id) ON DELETE CASCADE
 );
+`;
 
+const CREATE_PROJECT_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS luukahead_project (
 	id TEXT PRIMARY KEY,
 	name TEXT NOT NULL,
@@ -42,7 +83,9 @@ CREATE TABLE IF NOT EXISTS luukahead_project (
 	created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
 	FOREIGN KEY(owner_id) REFERENCES luukahead_user(id) ON DELETE CASCADE
 );
+`;
 
+const CREATE_ITEM_TYPES_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS luukahead_item_types (
 	id TEXT PRIMARY KEY,
 	project_id TEXT NOT NULL,
@@ -51,7 +94,9 @@ CREATE TABLE IF NOT EXISTS luukahead_item_types (
 	color TEXT,
 	FOREIGN KEY(project_id) REFERENCES luukahead_project(id) ON DELETE CASCADE
 );
+`;
 
+const CREATE_PRIORITIES_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS luukahead_priorities (
 	id TEXT PRIMARY KEY,
 	project_id TEXT NOT NULL,
@@ -60,7 +105,9 @@ CREATE TABLE IF NOT EXISTS luukahead_priorities (
 	color TEXT,
 	FOREIGN KEY(project_id) REFERENCES luukahead_project(id) ON DELETE CASCADE
 );
+`;
 
+const CREATE_WORK_ITEMS_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS luukahead_work_items (
 	id TEXT PRIMARY KEY,
 	project_id TEXT NOT NULL,
@@ -73,7 +120,7 @@ CREATE TABLE IF NOT EXISTS luukahead_work_items (
 	deadline INTEGER,
 	owner_id TEXT,
 	is_root INTEGER DEFAULT 0,
-    completed INTEGER DEFAULT 0,
+	completed INTEGER DEFAULT 0,
 	created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
 	updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
 	FOREIGN KEY(project_id) REFERENCES luukahead_project(id) ON DELETE CASCADE,
@@ -82,7 +129,9 @@ CREATE TABLE IF NOT EXISTS luukahead_work_items (
 	FOREIGN KEY(priority_id) REFERENCES luukahead_priorities(id),
 	FOREIGN KEY(owner_id) REFERENCES luukahead_user(id)
 );
+`;
 
+const CREATE_WORK_ITEM_VISIBILITY_TABLE_SQL = `
 CREATE TABLE IF NOT EXISTS luukahead_work_item_visibility (
 	work_item_id TEXT NOT NULL,
 	user_id TEXT NOT NULL,
@@ -92,29 +141,3 @@ CREATE TABLE IF NOT EXISTS luukahead_work_item_visibility (
 );
 `;
 
-try {
-		client.exec(initSql);
-} catch (e) {
-		// If initialization fails, log it but don't crash here; migrations are preferred for production.
-		// eslint-disable-next-line no-console
-		console.error('Failed to initialize database schema:', e);
-}
-
-// runtime migration: add `completed` column to work_items if it doesn't exist (local dev convenience)
-try {
-	const info = client.prepare(`PRAGMA table_info('luukahead_work_items')`).all();
-	const hasCompleted = info.some((r: any) => r.name === 'completed');
-	if (!hasCompleted) {
-		try {
-			client.prepare(`ALTER TABLE luukahead_work_items ADD COLUMN completed INTEGER DEFAULT 0`).run();
-			// eslint-disable-next-line no-console
-			console.log('Added completed column to luukahead_work_items');
-		} catch (e) {
-			// ignore if alter fails
-		}
-	}
-} catch (e) {
-	// ignore
-}
-
-export const db = drizzle(client, { schema });

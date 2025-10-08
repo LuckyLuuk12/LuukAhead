@@ -7,7 +7,7 @@ export const actions: Actions = {
 		if (!event.locals.session) {
 			return fail(401);
 		}
-		await auth.invalidateSession(event.locals.session.id);
+		await auth.invalidateSession(event.locals.session.id, event);
 		auth.deleteSessionTokenCookie(event);
 
 		return redirect(302, '/login');

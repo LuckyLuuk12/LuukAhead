@@ -1,52 +1,67 @@
 import type { RequestHandler } from './$types';
 import { validateSessionToken } from '$lib/server/auth';
-import { db } from '$lib/server/db';
+import { database } from '$lib/server/db';
 import * as schema from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
 
-export const PATCH: RequestHandler = async ({ params, request, cookies }) => {
-  const token = cookies.get('auth-session');
-  if (!token) return new Response('Unauthorized', { status: 401 });
-  const { session, user } = await validateSessionToken(token);
-  if (!session || !user) return new Response('Unauthorized', { status: 401 });
+export const PATCH: RequestHandler = async (event) => {
+	const token = event.cookies.get('auth-session');
+	if (!token) return new Response('Unauthorized', { status: 401 });
+	const { session, user } = await validateSessionToken(token, event);
+	if (!session || !user) return new Response('Unauthorized', { status: 401 });
 
-  const projectId = params.id;
-  if (!projectId) return new Response('Missing project id', { status: 400 });
+	const projectId = event.params.id;
+	if (!projectId) return new Response('Missing project id', { status: 400 });
 
-  const body = await request.json();
-  if (!body || typeof body.name !== 'string') return new Response('Missing name', { status: 400 });
-  const newName = body.name.trim();
-  if (!newName) return new Response('Name empty', { status: 400 });
+	const body = await event.request.json();
+	if (!body || typeof body.name !== 'string') return new Response('Missing name', { status: 400 });
+	const newName = body.name.trim();
+	if (!newName) return new Response('Name empty', { status: 400 });
 
-  // verify ownership
-  const projRows = await db.select().from(schema.project).where(eq(schema.project.id, projectId));
-  const p = projRows.at(0);
-  if (!p || p.ownerId !== user.id) return new Response('Forbidden', { status: 403 });
+	const { db } = await database(event);
 
-  // check duplicates (case-insensitive)
-  const existing = await db.select().from(schema.project).where(eq(schema.project.ownerId, user.id));
-  const dup = existing.find((r: any) => r.id !== projectId && r.name.toLowerCase() === newName.toLowerCase());
-  if (dup) return new Response('Duplicate', { status: 409 });
+	// verify ownership
+	const projRows = await db
+		.select()
+		.from(schema.project)
+		.where(eq(schema.project.id, projectId));
+	const p = projRows.at(0);
+	if (!p || p.ownerId !== user.id) return new Response('Forbidden', { status: 403 });
 
-  await db.update(schema.project).set({ name: newName }).where(eq(schema.project.id, projectId));
-  return new Response(JSON.stringify({ ok: true }));
+	// check duplicates (case-insensitive)
+	const existing = await db
+		.select()
+		.from(schema.project)
+		.where(eq(schema.project.ownerId, user.id));
+	const dup = existing.find(
+		(r: any) => r.id !== projectId && r.name.toLowerCase() === newName.toLowerCase()
+	);
+	if (dup) return new Response('Duplicate', { status: 409 });
+
+	await db.update(schema.project).set({ name: newName }).where(eq(schema.project.id, projectId));
+	return new Response(JSON.stringify({ ok: true }));
 };
 
-export const DELETE: RequestHandler = async ({ params, cookies }) => {
-  const token = cookies.get('auth-session');
-  if (!token) return new Response('Unauthorized', { status: 401 });
-  const { session, user } = await validateSessionToken(token);
-  if (!session || !user) return new Response('Unauthorized', { status: 401 });
+export const DELETE: RequestHandler = async (event) => {
+	const token = event.cookies.get('auth-session');
+	if (!token) return new Response('Unauthorized', { status: 401 });
+	const { session, user } = await validateSessionToken(token, event);
+	if (!session || !user) return new Response('Unauthorized', { status: 401 });
 
-  const projectId = params.id;
-  if (!projectId) return new Response('Missing project id', { status: 400 });
+	const projectId = event.params.id;
+	if (!projectId) return new Response('Missing project id', { status: 400 });
 
-  // verify ownership
-  const projRows = await db.select().from(schema.project).where(eq(schema.project.id, projectId));
-  const p = projRows.at(0);
-  if (!p || p.ownerId !== user.id) return new Response('Forbidden', { status: 403 });
+	const { db } = await database(event);
 
-  // Delete project (will cascade via foreign_keys in sqlite)
-  await db.delete(schema.project).where(eq(schema.project.id, projectId));
-  return new Response(null, { status: 204 });
+	// verify ownership
+	const projRows = await db
+		.select()
+		.from(schema.project)
+		.where(eq(schema.project.id, projectId));
+	const p = projRows.at(0);
+	if (!p || p.ownerId !== user.id) return new Response('Forbidden', { status: 403 });
+
+	// Delete project (will cascade via foreign_keys in sqlite)
+	await db.delete(schema.project).where(eq(schema.project.id, projectId));
+	return new Response(null, { status: 204 });
 };
