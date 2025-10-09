@@ -1,14 +1,8 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-	import { onDestroy } from 'svelte';
 	import favicon from '$lib/assets/favicon.png';
 	import type { SessionValidationResult } from '$lib/server/auth';
 
 	export let user: SessionValidationResult['user'];
-
-	let current = '';
-	const unsub = page.subscribe((p) => (current = p.url.pathname));
-	onDestroy(unsub);
 </script>
 
 <nav class="navbar">
@@ -16,7 +10,6 @@
 		<img src={favicon} alt="LuukAhead" />
 		<span>LuukAhead</span>
 	</a>
-	<a href="/projects" class:active={current === '/projects'}>Projects</a>
 	<div class="spacer"></div>
 	{#if user}
 		<span class="username">Hi, {user.username}!</span>
@@ -45,13 +38,20 @@
 		font-weight: 700;
 		font-size: 1.25rem;
 		color: var(--primary-500);
+		text-decoration: none;
+		padding: 0.5rem 1rem;
+		border-radius: 6px;
+		transition: color 0.2s ease;
+	}
+	.logo:hover {
+		color: var(--primary-400);
 	}
 	.logo img {
 		width: 3rem;
 		height: 3rem;
 		border-radius: var(--border-radius-large);
 	}
-	.navbar a {
+	.navbar a:not(.logo) {
 		text-decoration: none;
 		color: var(--light-200);
 		padding: 0.5rem 1rem;
@@ -59,12 +59,8 @@
 		transition: all 0.2s ease;
 		font-weight: 500;
 	}
-	.navbar a:hover {
+	.navbar a:not(.logo):hover {
 		background: var(--primary-700);
-		color: var(--light-50);
-	}
-	.navbar a.active {
-		background: var(--primary-500);
 		color: var(--light-50);
 	}
 	.spacer {

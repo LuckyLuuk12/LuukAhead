@@ -7,7 +7,8 @@ export const user = sqliteTable(`${table_prefix}user`, {
     id: text('id').primaryKey(),
     age: integer('age'),
     username: text('username').notNull().unique(),
-    passwordHash: text('password_hash').notNull()
+    passwordHash: text('password_hash'), // nullable for OAuth users
+    googleId: text('google_id').unique() // for Google OAuth
 });
 export type User = typeof user.$inferSelect;
 

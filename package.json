@@ -37,6 +37,7 @@
 		"@kablan/clean-ui": "1.0.9",
 		"@oslojs/crypto": "^1.0.1",
 		"@oslojs/encoding": "^1.1.0",
+		"arctic": "^3.7.0",
 		"better-sqlite3": "^12.4.1",
 		"dompurify": "^3.2.7",
 		"drizzle-orm": "^0.44.5",

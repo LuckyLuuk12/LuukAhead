@@ -48,7 +48,17 @@ export const load: PageServerLoad = async (event) => {
 	if (event.locals.user) {
 		return redirect(302, '/projects');
 	}
-	return {};
+	
+	// Check if Google OAuth is configured
+	const googleOAuthEnabled = !!(
+		event.platform?.env?.GOOGLE_CLIENT_ID &&
+		event.platform?.env?.GOOGLE_CLIENT_SECRET &&
+		event.platform?.env?.GOOGLE_REDIRECT_URI
+	);
+	
+	return {
+		googleOAuthEnabled
+	};
 };
 
 export const actions: Actions = {
