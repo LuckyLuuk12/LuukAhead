@@ -11,10 +11,10 @@ export const POST: RequestHandler = async (event) => {
 	const token = event.cookies.get('auth-session');
 	if (!token) return new Response('Unauthorized', { status: 401 });
 
-	const { session, user } = await validateSessionToken(token, event);
+	const { db, d1 } = await database(event);
+	const { session, user } = await validateSessionToken(db, token);
 	if (!session || !user) return new Response('Unauthorized', { status: 401 });
 
-	const { db, d1 } = await database(event);
 	const res = await createProject(db, d1, user.id, name);
 	return new Response(JSON.stringify(res), { status: 201 });
 };

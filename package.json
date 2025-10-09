@@ -17,8 +17,8 @@
 		"db:studio": "drizzle-kit studio"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-cloudflare": "^7.2.4",
 		"@cloudflare/workers-types": "^4.20251008.0",
+		"@sveltejs/adapter-cloudflare": "^7.2.4",
 		"@sveltejs/kit": "^2.46.4",
 		"@sveltejs/vite-plugin-svelte": "^6.2.0",
 		"@types/node": "^22",
@@ -34,10 +34,9 @@
 	},
 	"dependencies": {
 		"@fortawesome/fontawesome-free": "^7.1.0",
+		"@kablan/clean-ui": "1.0.9",
 		"@oslojs/crypto": "^1.0.1",
 		"@oslojs/encoding": "^1.1.0",
-		"@kablan/clean-ui": "1.0.9",
-		"argon2-browser": "^1.18.0",
 		"better-sqlite3": "^12.4.1",
 		"dompurify": "^3.2.7",
 		"drizzle-orm": "^0.44.5",

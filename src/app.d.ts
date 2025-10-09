@@ -1,3 +1,5 @@
+import { D1Database } from '@cloudflare/workers-types';
+
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 declare global {
@@ -5,6 +7,11 @@ declare global {
 		interface Locals {
 			user: import('$lib/server/auth').SessionValidationResult['user'];
 			session: import('$lib/server/auth').SessionValidationResult['session']
+		}
+		interface Platform {
+			env?: {
+				D1: D1Database;
+			}
 		}
 	} // interface Error {}
 	// interface Locals {}

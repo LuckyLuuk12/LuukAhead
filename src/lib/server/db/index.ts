@@ -14,47 +14,61 @@ export type { D1Database };
  * ```
  * const db = database(event);
  * ```
+ * @throws Error if the D1 database binding is not available
  */
 export const database = async (event: any) => {
-	const d1 = (event.platform as { env: { DB: D1Database; DEV_DB_AUTOCREATE?: string } }).env.DB;
-	const db = drizzle(d1, { schema });
+	try {
+		if (!event.platform?.env?.DB) {
+			throw new Error('D1 database binding not found. Make sure DB is configured in wrangler.toml');
+		}
 
-	const isDev = event.platform?.env?.DEV_DB_AUTOCREATE === 'true';
+		const d1 = event.platform.env.DB as D1Database;
+		const db = drizzle(d1, { schema });
 
-	if (isDev) {
-		// Use D1 binding directly for raw SQL to check and create tables
-		const tablesRes = await d1
-			.prepare(
-				`SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'luukahead_%';`
-			)
-			.all();
-		const foundTables = new Set(tablesRes.results?.map((row: any) => row.name));
+		const isDev = event.platform?.env?.DEV_DB_AUTOCREATE === 'true';
 
-		// Create tables if they don't exist
-		if (!foundTables.has('luukahead_user')) {
-			await d1.batch([d1.prepare(CREATE_USER_TABLE_SQL)]);
+		if (isDev) {
+			// Use D1 binding directly for raw SQL to check and create tables
+			const tablesRes = await d1
+				.prepare(
+					`SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'luukahead_%';`
+				)
+				.all();
+			const foundTables = new Set(tablesRes.results?.map((row: any) => row.name));
+
+			// Create tables if they don't exist
+			if (!foundTables.has('luukahead_user')) {
+				await d1.batch([d1.prepare(CREATE_USER_TABLE_SQL)]);
+			}
+			if (!foundTables.has('luukahead_session')) {
+				await d1.batch([d1.prepare(CREATE_SESSION_TABLE_SQL)]);
+			}
+			if (!foundTables.has('luukahead_project')) {
+				await d1.batch([d1.prepare(CREATE_PROJECT_TABLE_SQL)]);
+			}
+			if (!foundTables.has('luukahead_item_types')) {
+				await d1.batch([d1.prepare(CREATE_ITEM_TYPES_TABLE_SQL)]);
+			}
+			if (!foundTables.has('luukahead_priorities')) {
+				await d1.batch([d1.prepare(CREATE_PRIORITIES_TABLE_SQL)]);
+			}
+			if (!foundTables.has('luukahead_work_items')) {
+				await d1.batch([d1.prepare(CREATE_WORK_ITEMS_TABLE_SQL)]);
+			}
+			if (!foundTables.has('luukahead_work_item_visibility')) {
+				await d1.batch([d1.prepare(CREATE_WORK_ITEM_VISIBILITY_TABLE_SQL)]);
+			}
 		}
-		if (!foundTables.has('luukahead_session')) {
-			await d1.batch([d1.prepare(CREATE_SESSION_TABLE_SQL)]);
-		}
-		if (!foundTables.has('luukahead_project')) {
-			await d1.batch([d1.prepare(CREATE_PROJECT_TABLE_SQL)]);
-		}
-		if (!foundTables.has('luukahead_item_types')) {
-			await d1.batch([d1.prepare(CREATE_ITEM_TYPES_TABLE_SQL)]);
-		}
-		if (!foundTables.has('luukahead_priorities')) {
-			await d1.batch([d1.prepare(CREATE_PRIORITIES_TABLE_SQL)]);
-		}
-		if (!foundTables.has('luukahead_work_items')) {
-			await d1.batch([d1.prepare(CREATE_WORK_ITEMS_TABLE_SQL)]);
-		}
-		if (!foundTables.has('luukahead_work_item_visibility')) {
-			await d1.batch([d1.prepare(CREATE_WORK_ITEM_VISIBILITY_TABLE_SQL)]);
-		}
+
+		return { db, d1 };
+	} catch (err) {
+		console.error('Database connection error:', err);
+		throw new Error(
+			err instanceof Error
+				? `Database connection failed: ${err.message}`
+				: 'Database connection failed'
+		);
 	}
-
-	return { db, d1 };
 };
 
 const CREATE_USER_TABLE_SQL = `
