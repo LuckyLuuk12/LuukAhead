@@ -3,6 +3,7 @@
   export let open: boolean = false;
   export let item: any = null; // work item object
   export let projectId: string;
+  export let priorities: any[] = [];
   const dispatch = createEventDispatcher();
 
   let dlg: HTMLDialogElement | null = null;
@@ -13,7 +14,6 @@
   let completedBool = false;
   let priority_id: string | null = null;
   let deadlineStr = '';
-  let priorities: any[] = [];
   let editMode = false;
   let renderedDescription = '';
   let renderedRemarks = '';
@@ -76,13 +76,6 @@ function escapeHtml(str: string) {
   }
 
   onMount(async () => {
-    if (!projectId) return;
-    try {
-      const res = await fetch(`/api/projects/${projectId}/priorities`);
-      if (res.ok) priorities = await res.json();
-    } catch (e) {
-      // ignore
-    }
     // pre-initialize markdown renderer in browser
     try { await ensureMarkdown(); } catch (e) { /* ignore */ }
   });

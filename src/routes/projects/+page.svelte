@@ -4,6 +4,7 @@
 	let projects = [] as any[];
 	let name = '';
 	let selected: string | null = null;
+	let showProjectsList: boolean = true;
 
 	// local edit state
 	let edits: Record<string, string> = {};
@@ -93,16 +94,26 @@
 
 <div class="projects-page">
 	<div class="page-header">
-		<h1>Projects</h1>
+			<div class="title-row">
+				<h1>Projects</h1>
+			</div>
 		<div class="create-project">
 			<input bind:value={name} placeholder="New project name" class="input-field" />
 			<button on:click={create} class="btn-primary">+ Create</button>
 		</div>
 	</div>
 
-	<div class="projects-container">
-		<div class="projects-list">
-			<h3>Your Projects</h3>
+		<div class="projects-container">
+			{#if showProjectsList}
+				<div class="projects-list">
+				<div class="projects-list-header">
+					<button class="list-collapse-btn" title="Collapse" on:click={() => showProjectsList = false} aria-label="Collapse projects list">
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<polyline points="15 18 9 12 15 6"></polyline>
+						</svg>
+					</button>
+					<h3>Your Projects</h3>
+				</div>
 			<ul>
 				{#each projects as p}
 					<li class:selected={selected === p.id}>
@@ -125,7 +136,14 @@
 					</li>
 				{/each}
 			</ul>
-		</div>
+				</div>
+			{:else}
+				<div class="projects-collapsed-bar" title="Open projects list" on:click={() => showProjectsList = true} aria-label="Open projects list" on:keypress={(e) => { if (e.key === 'Enter' || e.key === ' ') showProjectsList = true; }} tabindex="0" role="button">
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<polyline points="9 18 15 12 9 6"></polyline>
+					</svg>
+				</div>
+			{/if}
 		<div class="project-content">
 			{#if selected}
 				<ProjectViewer projectId={selected} />
@@ -183,7 +201,7 @@
 	}
 	.projects-container {
 		display: flex;
-		gap: 1.5rem;
+		gap: 0.5rem;
 		flex: 1;
 		overflow: hidden;
 	}
@@ -194,6 +212,44 @@
 		padding: 1rem;
 		overflow-y: auto;
 		box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+	}
+
+	.projects-collapsed-bar {
+		width: 24px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: rgba(255,255,255,0.2);
+		border-radius: 4px;
+		cursor: pointer;
+		color: var(--light-200);
+		border: 1px solid rgba(255,255,255,0.03);
+	}
+
+	.title-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.projects-list-header {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.list-collapse-btn {
+		padding: 0.25rem 0.5rem;
+		background: transparent;
+		border: 1px solid var(--dark-700);
+		border-radius: 6px;
+		cursor: pointer;
+		color: var(--light-200);
+	}
+
+	.list-collapse-btn:hover {
+		background: var(--dark-700);
+		color: var(--light-100);
 	}
 	.projects-list h3 {
 		margin: 0 0 1rem 0;
@@ -275,7 +331,7 @@
 		flex: 1;
 		background: var(--card);
 		border-radius: 8px;
-		padding: 1rem;
+		padding: 0.05rem;
 		overflow: auto;
 		box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 	}

@@ -294,12 +294,12 @@
     width: 300px;
     background: var(--card);
     border-radius: 8px;
-    padding: 1rem;
+    padding: 0.5rem;
     overflow-y: auto;
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
+    gap: 0.5rem;
   }
   .sidebar-section {
     display: flex;

@@ -31,6 +31,6 @@
 	main {
 		flex: 1;
 		overflow: auto;
-		padding: 1.5rem;
+		padding: 0.5rem;
 	}
 </style>

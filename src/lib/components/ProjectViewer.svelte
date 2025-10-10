@@ -6,9 +6,11 @@
 
 	let items: any[] = [];
 	let types: any[] = [];
-	let viewMode: 'tree' | 'pyramid' = 'pyramid'; // default to pyramid view
+	let priorities: any[] = [];
+	let showSidebar: boolean = false; // sidebar hidden by default
+	let viewMode: 'tree' | 'pyramid' | 'columns' = 'pyramid'; // default to pyramid view
 	let expandedNodes = new Set<string>(); // track which nodes are expanded
-	let previousViewMode: 'tree' | 'pyramid' = viewMode;
+	let previousViewMode: 'tree' | 'pyramid' | 'columns' = viewMode;
 
 	// When switching view modes, adjust expanded state
 	$: if (viewMode !== previousViewMode) {
@@ -29,6 +31,8 @@
 		const res = await fetch(`/api/projects/${projectId}/work-items`);
 		if (res.ok) items = await res.json();
 		else console.error('failed to load items', res.status);
+
+
 	}
 
 	async function loadTypes() {
@@ -36,6 +40,15 @@
 		const res = await fetch(`/api/projects/${projectId}/item-types`);
 		if (res.ok) types = await res.json();
 		else console.error('failed to load types', res.status);
+
+
+	}
+
+	async function loadPriorities() {
+		if (!projectId) return;
+		const res = await fetch(`/api/projects/${projectId}/priorities`);
+		if (res.ok) priorities = await res.json();
+		else console.error('failed to load priorities', res.status);
 	}
 
 	function toggleExpand(nodeId: string) {
@@ -48,7 +61,7 @@
 	}
 
 	onMount(async () => {
-		await loadTypes();
+		await Promise.all([loadTypes(), loadPriorities()]);
 		await loadItems();
 		// Initialize with root expanded in pyramid mode
 		if (viewMode === 'pyramid' && rootNode) {
@@ -83,7 +96,10 @@
 		}
 
 		tree.forEach((r) => setDepth(r, 0));
+
 	}
+
+	
 
 	let rootNode: any = null;
 	$: rootNode = tree.find((r) => r.is_root) ?? (tree.length ? tree[0] : null);
@@ -110,6 +126,45 @@
 		return layers;
 	})();
 
+// Columns view: group items by their type index (depth -> type)
+$: columns = (() => {
+	// produce an array of columns: one per type, plus a backlog column for items without type
+	const cols: any[] = [];
+	if (!items || items.length === 0) return cols;
+
+	// Build a depth map from the already-computed `tree` structure
+	// `tree` nodes were assigned `.depth` in the reactive block above. We need to map item.id -> depth
+	const depthMap = new Map<string, number>();
+	function walk(node: any) {
+		depthMap.set(node.id, node.depth ?? 0);
+		if (node.children) node.children.forEach((c: any) => walk(c));
+	}
+	tree.forEach((r) => walk(r));
+
+	const typeCount = Math.max(0, types?.length || 0);
+	for (let i = 0; i < typeCount; i++) cols.push([]);
+	const backlog: any[] = [];
+
+	// Assign items into columns using the depth from depthMap. Also attach `depth` to the item clones
+	// EXCLUDE root items (is_root=true) from columns view
+	items.forEach((it) => {
+		if (it.is_root) return; // skip root
+		const depth = depthMap.get(it.id) ?? 0;
+		const typeIdx = Math.max(0, depth - 1);
+		const node = { ...it, depth };
+		if (typeIdx >= 0 && typeIdx < typeCount) {
+			cols[typeIdx].push(node);
+		} else {
+			backlog.push(node);
+		}
+	});
+
+	if (backlog.length) cols.push(backlog);
+
+
+	return cols;
+})();
+
 </script>
 
 <div class="project-viewer-wrap">
@@ -132,11 +187,28 @@
 				>
 					🔺 Pyramid
 				</button>
+				<button 
+					class="toggle-btn" 
+					class:active={viewMode === 'columns'} 
+					on:click={() => { viewMode = 'columns' }}
+					title="Columns view - one column per type"
+				>
+					📋 Columns
+				</button>
+				<button
+					class="settings-btn"
+					class:active={showSidebar}
+					on:click={() => (showSidebar = !showSidebar)}
+					title="Toggle sidebar"
+					aria-label="Toggle sidebar"
+				>
+					⚙️
+				</button>
 			</div>
 		</div>
 	</div>
 	<div class="bottom-section">
-		<div class="project-viewer" class:pyramid-mode={viewMode === 'pyramid'}>
+		<div class="project-viewer" class:pyramid-mode={viewMode === 'pyramid'} class:full-width={!showSidebar}>
 			{#if tree.length === 0}
 				<div class="empty-message">No items yet — add items using the sidebar</div>
 			{:else if viewMode === 'pyramid'}
@@ -148,6 +220,7 @@
 								{node}
 								{projectId}
 								{types}
+								{priorities}
 								{viewMode}
 								{expandedNodes}
 								standalone={true}
@@ -157,13 +230,29 @@
 						{/each}
 					</div>
 				{/each}
-			{:else}
-				<!-- Tree view: traditional nested -->
-				{#if rootNode}
+				
+				{:else if viewMode === 'columns'}
+					<!-- Columns view: one column per type (like GitHub Projects) -->
+					<div class="columns-view">
+						{#each columns as col, idx}
+							<div class="column" data-index={idx}>
+								<div class="column-header">{types?.[idx]?.name ?? (idx === columns.length -1 && types?.length ? 'Backlog' : `Column ${idx+1}`)}</div>
+								<div class="column-body">
+									{#each col as node}
+										<Layer node={node} {projectId} {types} {priorities} viewMode={'columns'} expandedNodes={expandedNodes} standalone={true} on:created={() => loadItems()} />
+									{/each}
+								</div>
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<!-- Tree view: traditional nested -->
+					{#if rootNode}
 					<Layer 
 						node={rootNode} 
 						{projectId} 
 						{types} 
+						{priorities}
 						{viewMode}
 						{expandedNodes}
 						standalone={false}
@@ -173,7 +262,9 @@
 				{/if}
 			{/if}
 		</div>
-		<ProjectSidebar projectId={projectId} on:changed={() => loadItems()} />
+		{#if showSidebar}
+			<ProjectSidebar projectId={projectId} on:changed={() => loadItems()} />
+		{/if}
 	</div>
 </div>
 
@@ -187,7 +278,6 @@
 	}
 	.top-section {
 		flex-shrink: 0;
-		padding: 0.5rem;
 		background: var(--card);
 		border-bottom: 1px solid var(--dark-700);
 	}
@@ -234,7 +324,29 @@
 		flex-direction: column;
 		gap: 1rem;
 		overflow-y: auto;
-		padding: 0.5rem;
+	}
+
+	.project-viewer.full-width {
+		/* when sidebar hidden, take full area */
+		margin-right: 0;
+	}
+
+	.settings-btn {
+		padding: 0.35rem 0.6rem;
+		background: transparent;
+		border: none;
+		border-radius: 6px;
+		cursor: pointer;
+		color: var(--light-300);
+		font-size: 0.95rem;
+	}
+	.settings-btn:hover {
+		background: var(--dark-700);
+		color: var(--light-100);
+	}
+	.settings-btn.active {
+		background: var(--primary-600);
+		color: var(--light-50);
 	}
 	.project-viewer.pyramid-mode {
 		gap: 0;
@@ -259,6 +371,37 @@
 		padding: 2rem;
 		color: var(--light-400);
 		font-size: 1rem;
+	}
+
+	/* Columns view styles */
+	.columns-view {
+		display: flex;
+		gap: 1rem;
+		align-items: flex-start;
+		padding: 0.5rem;
+		overflow-x: auto;
+	}
+	.column {
+		min-width: 260px;
+		width: 300px;
+		background: transparent;
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+	.column-header {
+		font-weight: 700;
+		color: var(--light-100);
+		padding: 0.5rem 0.75rem;
+		border-radius: 8px;
+		background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+		border: 1px solid rgba(255,255,255,0.03);
+	}
+	.column-body {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		padding: 0.5rem 0.25rem;
 	}
 </style>
 

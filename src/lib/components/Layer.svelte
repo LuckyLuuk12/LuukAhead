@@ -4,7 +4,8 @@
 	export let node: any;
 	export let projectId: string;
 	export let types: any[] = [];
-	export let viewMode: 'tree' | 'pyramid' = 'tree';
+	export let priorities: any[] = [];
+	export let viewMode: 'tree' | 'pyramid' | 'columns' = 'tree';
 	export let expandedNodes: Set<string> = new Set();
 	export let standalone: boolean = false; // In pyramid mode, don't render children
 	
@@ -119,9 +120,17 @@ function openModalOnKeypress(e: KeyboardEvent) {
 		// Show the type of this node, not its children
 		// depth 0 = project root (no type shown), depth 1 = first type, etc.
 		if (depth === 0) return 'Project Root';
+		// Use the node's actual type_id to find the type name, not depth-based indexing
+		if (node.type_id) {
+			const t = types.find(t => t.id === node.type_id);
+			if (t) return t.name;
+		}
+		// fallback to depth-based if no type_id
 		const typeIdx = depth - 1;
-		if (typeIdx >= types.length) return null;
-		return types?.[typeIdx]?.name ?? `Type ${depth}`;
+		if (typeIdx >= 0 && typeIdx < types.length) {
+			return types[typeIdx]?.name ?? `Type ${depth}`;
+		}
+		return null;
 	}
 
 	// derived names for markup
@@ -157,14 +166,14 @@ function openModalOnKeypress(e: KeyboardEvent) {
 			{#if showChildren && node.children?.length}
 				<div class="children-container">
 					{#each node.children as child}
-						<svelte:self node={child} {projectId} {types} {viewMode} {expandedNodes} {standalone} on:created on:toggle />
+						<svelte:self node={child} {projectId} {types} {priorities} {viewMode} {expandedNodes} {standalone} on:created on:toggle />
 					{/each}
 				</div>
 			{/if}
 		</div>
 	</div>
 	
-	<WorkItemModal bind:open={modalOpen} item={modalItem} {projectId} on:saved={() => { dispatch('created'); modalOpen = false; }} />
+	<WorkItemModal bind:open={modalOpen} item={modalItem} {projectId} {priorities} on:saved={() => { dispatch('created'); modalOpen = false; }} />
 </div>
 
 <style>
