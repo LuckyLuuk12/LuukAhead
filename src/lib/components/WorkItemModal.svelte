@@ -1,10 +1,13 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
+  import { encryptWorkItem, decryptWorkItem } from '$lib/crypto';
+  
   export let open: boolean = false;
   export let item: any = null; // work item object
   export let projectId: string;
   export let priorities: any[] = [];
   export let types: any[] = [];
+  export let passkey: string = ''; // Encryption passkey (optional)
   const dispatch = createEventDispatcher();
 
   let dlg: HTMLDialogElement | null = null;
@@ -81,7 +84,7 @@ function escapeHtml(str: string) {
 
   async function save() {
     if (!projectId || !item) return;
-    const body: any = {
+    let body: any = {
       title: title || 'Untitled',
       description: description || null,
       remarks: remarks || null,
@@ -89,6 +92,11 @@ function escapeHtml(str: string) {
       status: status
     };
     if (deadlineStr) body.deadline = Math.floor(new Date(deadlineStr).getTime() / 1000);
+
+    // Encrypt sensitive fields if passkey is provided
+    if (passkey) {
+      body = await encryptWorkItem(body, passkey);
+    }
 
     const res = await fetch(`/api/projects/${projectId}/work-items/${item.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)

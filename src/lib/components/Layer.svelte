@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { createEventDispatcher } from 'svelte';
 	import WorkItemModal from './WorkItemModal.svelte';
+	import { encryptWorkItem } from '$lib/crypto';
 	export let node: any;
 	export let projectId: string;
 	export let types: any[] = [];
@@ -9,6 +10,7 @@
 	export let expandedNodes: Set<string> = new Set();
 	export let standalone: boolean = false; // In pyramid mode, don't render children
 	export let epicInfo: { title: string; number: number; color: string } | null = null; // Epic tag info
+	export let passkey: string = ''; // Encryption passkey (optional)
 	
 	const dispatch = createEventDispatcher();
 	let modalOpen = false;
@@ -77,8 +79,12 @@ function openModalOnKeypress(e: KeyboardEvent) {
 		// root has no siblings
 		if (node.is_root) return;
 	const myType = types?.[node.depth - 1];
+	let body: any = { parent_id: node.parent_id ?? null, title: 'New item', type_id: myType?.id ?? null };
+	if (passkey) {
+		body = await encryptWorkItem(body, passkey);
+	}
 	const res = await fetch(`/api/projects/${projectId}/work-items`, {
-		method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parent_id: node.parent_id ?? null, title: 'New item', type_id: myType?.id ?? null })
+		method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
 	});
 		if (res.ok) dispatch('created'); else console.error('Failed to create sibling', await res.text());
 	}
@@ -86,8 +92,12 @@ function openModalOnKeypress(e: KeyboardEvent) {
 	// Add a nested child of the next type (the type index equals node.depth)
 	async function addChild() {
 		const nextType = types?.[node.depth];
+		let body: any = { parent_id: node.id, title: 'New item', type_id: nextType?.id ?? null };
+		if (passkey) {
+			body = await encryptWorkItem(body, passkey);
+		}
 		const res = await fetch(`/api/projects/${projectId}/work-items`, {
-			method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parent_id: node.id, title: 'New item', type_id: nextType?.id ?? null })
+			method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
 		});
 		if (res.ok) dispatch('created'); else console.error('Failed to create child', await res.text());
 	}
@@ -101,8 +111,12 @@ function openModalOnKeypress(e: KeyboardEvent) {
 	async function addFirstLayer() {
 		// only for root: create a child with the first type if available
 		const firstType = types?.[0];
+		let body: any = { parent_id: node.id, title: 'Layer', type_id: firstType?.id ?? null };
+		if (passkey) {
+			body = await encryptWorkItem(body, passkey);
+		}
 		const res = await fetch(`/api/projects/${projectId}/work-items`, {
-			method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parent_id: node.id, title: 'Layer', type_id: firstType?.id ?? null })
+			method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
 		});
 		if (res.ok) dispatch('created'); else console.error('Failed to create first layer', await res.text());
 	}
@@ -111,8 +125,12 @@ function openModalOnKeypress(e: KeyboardEvent) {
 		// add a nested layer inside this node of the next type in order (depth+1)
 		const nextType = types?.[node.depth + 1];
 		if (!nextType) return;
+		let body: any = { parent_id: node.id, title: 'Layer', type_id: nextType.id };
+		if (passkey) {
+			body = await encryptWorkItem(body, passkey);
+		}
 		const res = await fetch(`/api/projects/${projectId}/work-items`, {
-			method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parent_id: node.id, title: 'Layer', type_id: nextType.id })
+			method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
 		});
 		if (res.ok) dispatch('created'); else console.error('Failed to create nested layer', await res.text());
 	}
@@ -238,14 +256,14 @@ function openModalOnKeypress(e: KeyboardEvent) {
 			{#if showChildren && node.children?.length}
 				<div class="children-container">
 					{#each node.children as child}
-						<svelte:self node={child} {projectId} {types} {priorities} epicInfo={null} {viewMode} {expandedNodes} {standalone} on:created on:toggle />
+						<svelte:self node={child} {projectId} {types} {priorities} epicInfo={null} {viewMode} {expandedNodes} {standalone} {passkey} on:created on:toggle />
 					{/each}
 				</div>
 			{/if}
 		</div>
 	</div>
 	
-	<WorkItemModal bind:open={modalOpen} item={modalItem} {projectId} {types} {priorities} on:saved={() => { dispatch('created'); modalOpen = false; }} />
+	<WorkItemModal bind:open={modalOpen} item={modalItem} {projectId} {types} {priorities} {passkey} on:saved={() => { dispatch('created'); modalOpen = false; }} />
 </div>
 
 <style>

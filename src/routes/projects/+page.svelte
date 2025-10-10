@@ -6,6 +6,12 @@
 	let selected: string | null = null;
 	let showProjectsList: boolean = true;
 
+	// Passkey management (stored in memory only, per project)
+	let projectPasskeys = new Map<string, string>(); // projectId -> passkey
+	let passkeyInput = ''; // Input for current project's passkey
+	let showPasskeyWarning = false;
+	let passkeyError = '';
+
 	// local edit state
 	let edits: Record<string, string> = {};
 	let saving: Record<string, boolean> = {};
@@ -83,10 +89,49 @@
 		if (res.ok) {
 			// refresh
 			await load();
-			if (selected === id) selected = null;
+			if (selected === id) {
+				selected = null;
+				projectPasskeys.delete(id);
+				passkeyInput = '';
+			}
 		} else {
 			alert('Failed to delete project');
 		}
+	}
+
+	// Set passkey for current project
+	function setPasskey() {
+		if (!selected) return;
+		if (!passkeyInput.trim()) {
+			passkeyError = 'Passkey cannot be empty';
+			return;
+		}
+		projectPasskeys.set(selected, passkeyInput);
+		projectPasskeys = projectPasskeys; // trigger reactivity
+		passkeyError = '';
+		showPasskeyWarning = false;
+	}
+
+	// Clear passkey for current project
+	function clearPasskey() {
+		if (!selected) return;
+		projectPasskeys.delete(selected);
+		projectPasskeys = projectPasskeys;
+		passkeyInput = '';
+	}
+
+	// Get passkey for a project (returns empty string if not set)
+	function getPasskey(projectId: string): string {
+		return projectPasskeys.get(projectId) || '';
+	}
+
+	// Check if current project has passkey set
+	$: hasPasskey = selected ? projectPasskeys.has(selected) : false;
+	$: currentPasskey = selected ? getPasskey(selected) : '';
+
+	// Update passkeyInput when project selection changes
+	$: if (selected) {
+		passkeyInput = getPasskey(selected);
 	}
 
 	onMount(load);
@@ -97,9 +142,65 @@
 			<div class="title-row">
 				<h1>Projects</h1>
 			</div>
-		<div class="create-project">
-			<input bind:value={name} placeholder="New project name" class="input-field" />
-			<button on:click={create} class="btn-primary">+ Create</button>
+		<div class="header-controls">
+			<div class="create-project">
+				<input bind:value={name} placeholder="New project name" class="input-field" />
+				<button on:click={create} class="btn-primary">+ Create</button>
+			</div>
+			
+			{#if selected}
+				<div class="passkey-section">
+					<div class="passkey-header">
+						<label for="passkey-input" class="passkey-label">
+							🔐 Encryption Passkey
+							<button 
+								class="info-btn" 
+								on:click={() => showPasskeyWarning = !showPasskeyWarning}
+								title="What is this?"
+								type="button"
+							>
+								ⓘ
+							</button>
+						</label>
+						{#if hasPasskey}
+							<span class="passkey-status active">✓ Active</span>
+						{:else}
+							<span class="passkey-status inactive">⚠️ Not Set</span>
+						{/if}
+					</div>
+					<div class="passkey-input-row">
+						<input
+							id="passkey-input"
+							type="password"
+							bind:value={passkeyInput}
+							placeholder="Enter passkey for this project..."
+							class="input-field passkey-input"
+							on:keydown={(e) => { if (e.key === 'Enter') setPasskey(); }}
+						/>
+						<button on:click={setPasskey} class="btn-secondary" title="Set passkey">
+							Set
+						</button>
+						{#if hasPasskey}
+							<button on:click={clearPasskey} class="btn-danger-small" title="Clear passkey">
+								Clear
+							</button>
+						{/if}
+					</div>
+					{#if passkeyError}
+						<div class="passkey-error">{passkeyError}</div>
+					{/if}
+					{#if showPasskeyWarning}
+						<div class="passkey-warning">
+							<strong>⚠️ Important:</strong> Your passkey encrypts all sensitive data (titles, descriptions, remarks) 
+							<strong>before</strong> it's sent to the server. The server cannot read your encrypted data.
+							<br><br>
+							<strong>You MUST remember this passkey!</strong> If you lose it, your data cannot be recovered.
+							<br><br>
+							💡 Tip: Each project can have a different passkey. Leave blank to disable encryption.
+						</div>
+					{/if}
+				</div>
+			{/if}
 		</div>
 	</div>
 
@@ -146,7 +247,17 @@
 			{/if}
 		<div class="project-content">
 			{#if selected}
-				<ProjectViewer projectId={selected} />
+				{#if hasPasskey || !passkeyInput}
+					<ProjectViewer projectId={selected} passkey={currentPasskey} />
+				{:else}
+					<div class="empty-state passkey-required">
+						<div class="passkey-prompt">
+							<h2>🔐 Passkey Required</h2>
+							<p>Please set a passkey above to view or edit this project.</p>
+							<p class="hint">Or leave it blank if you don't want encryption.</p>
+						</div>
+					</div>
+				{/if}
 			{:else}
 				<div class="empty-state">
 					<p>Select a project to view</p>
@@ -165,14 +276,20 @@
 	}
 	.page-header {
 		display: flex;
-		justify-content: space-between;
-		align-items: center;
+		flex-direction: column;
+		gap: 1rem;
 		padding-bottom: 1rem;
 		border-bottom: 2px solid var(--primary-500);
 	}
 	.page-header h1 {
 		margin: 0;
 		color: var(--light-100);
+	}
+	.header-controls {
+		display: flex;
+		gap: 2rem;
+		align-items: flex-start;
+		flex-wrap: wrap;
 	}
 	.create-project {
 		display: flex;
@@ -198,6 +315,139 @@
 	}
 	.btn-primary:hover {
 		background: var(--primary-600);
+	}
+	.btn-secondary {
+		padding: 0.5rem 1rem;
+		background: var(--dark-700);
+		color: var(--light-100);
+		border: 1px solid var(--dark-600);
+		border-radius: 6px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+	.btn-secondary:hover {
+		background: var(--dark-600);
+		border-color: var(--primary-500);
+	}
+	.btn-danger-small {
+		padding: 0.5rem 1rem;
+		background: transparent;
+		color: var(--red-400);
+		border: 1px solid var(--red-600);
+		border-radius: 6px;
+		font-weight: 600;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+	.btn-danger-small:hover {
+		background: var(--red-700);
+		border-color: var(--red-600);
+		color: var(--light-50);
+	}
+	.passkey-section {
+		flex: 1;
+		max-width: 600px;
+		background: var(--container);
+		padding: 1rem;
+		border-radius: 8px;
+		border: 1px solid var(--dark-700);
+	}
+	.passkey-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 0.5rem;
+	}
+	.passkey-label {
+		color: var(--light-200);
+		font-size: 0.9rem;
+		font-weight: 600;
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.info-btn {
+		background: transparent;
+		border: 1px solid var(--dark-600);
+		color: var(--light-400);
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		cursor: pointer;
+		font-size: 0.75rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		transition: all 0.2s;
+		padding: 0;
+	}
+	.info-btn:hover {
+		background: var(--dark-700);
+		border-color: var(--primary-500);
+		color: var(--primary-400);
+	}
+	.passkey-status {
+		font-size: 0.85rem;
+		font-weight: 600;
+		padding: 0.25rem 0.75rem;
+		border-radius: 12px;
+	}
+	.passkey-status.active {
+		background: var(--green-900);
+		color: var(--green-400);
+		border: 1px solid var(--green-700);
+	}
+	.passkey-status.inactive {
+		background: var(--dark-800);
+		color: var(--light-400);
+		border: 1px solid var(--dark-600);
+	}
+	.passkey-input-row {
+		display: flex;
+		gap: 0.5rem;
+		align-items: center;
+	}
+	.passkey-input {
+		flex: 1;
+	}
+	.passkey-error {
+		color: var(--red-400);
+		font-size: 0.85rem;
+		margin-top: 0.5rem;
+	}
+	.passkey-warning {
+		margin-top: 1rem;
+		padding: 1rem;
+		background: var(--dark-800);
+		border-left: 3px solid var(--primary-500);
+		border-radius: 4px;
+		color: var(--light-300);
+		font-size: 0.9rem;
+		line-height: 1.6;
+	}
+	.passkey-warning strong {
+		color: var(--light-100);
+	}
+	.passkey-required {
+		background: var(--container);
+	}
+	.passkey-prompt {
+		text-align: center;
+		padding: 2rem;
+	}
+	.passkey-prompt h2 {
+		color: var(--light-100);
+		margin-bottom: 1rem;
+	}
+	.passkey-prompt p {
+		color: var(--light-300);
+		margin: 0.5rem 0;
+	}
+	.passkey-prompt .hint {
+		font-size: 0.9rem;
+		color: var(--light-400);
+		font-style: italic;
 	}
 	.projects-container {
 		display: flex;

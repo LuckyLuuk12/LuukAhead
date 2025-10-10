@@ -3,7 +3,10 @@
 	import Layer from './Layer.svelte';
 	import ProjectSidebar from './ProjectSidebar.svelte';
 	import Filter from './Filter.svelte';
+	import { decryptWorkItem, encryptWorkItem } from '$lib/crypto';
+	
 	export let projectId: string;
+	export let passkey: string = ''; // Encryption passkey (optional)
 
 	let items: any[] = [];
 	let types: any[] = [];
@@ -51,10 +54,17 @@
 	async function loadItems() {
 		if (!projectId) return;
 		const res = await fetch(`/api/projects/${projectId}/work-items`);
-		if (res.ok) items = await res.json();
-		else console.error('failed to load items', res.status);
-
-
+		if (res.ok) {
+			const rawItems = await res.json();
+			// Decrypt items if passkey is provided
+			if (passkey) {
+				items = await Promise.all(rawItems.map((item: any) => decryptWorkItem(item, passkey)));
+			} else {
+				items = rawItems;
+			}
+		} else {
+			console.error('failed to load items', res.status);
+		}
 	}
 
 	async function loadTypes() {
@@ -426,10 +436,15 @@ async function confirmChanges() {
 	}
 
 	// Prepare batch update payload
-	const updates = Array.from(pendingChanges.entries()).map(([itemId, changes]) => ({
+	let updates = Array.from(pendingChanges.entries()).map(([itemId, changes]) => ({
 		id: itemId,
 		...changes
 	}));
+
+	// Encrypt each update if passkey is provided
+	if (passkey) {
+		updates = await Promise.all(updates.map(update => encryptWorkItem(update, passkey)));
+	}
 
 	try {
 		const res = await fetch(`/api/projects/${projectId}/work-items/batch`, {
@@ -592,7 +607,7 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 				{#each pyramidLayers as layer, depth}
 					<div class="pyramid-layer" data-depth={depth}>
 						{#each layer as node}
-							{@const epicInfo = getEpicForItem(node.id)}
+						{@const epicInfo = getEpicForItem(node.id)}
 							<Layer 
 								{node}
 								{projectId}
@@ -601,6 +616,7 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 								{epicInfo}
 								{viewMode}
 								{expandedNodes}
+								{passkey}
 								standalone={true}
 								on:created={() => loadItems()}
 								on:toggle={(e) => toggleExpand(e.detail)}
@@ -628,7 +644,7 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 								</div>
 								<div class="column-body">
 									{#each col as node}
-										{@const epicInfo = getEpicForItem(node.id)}
+									{@const epicInfo = getEpicForItem(node.id)}
 										<div
 											draggable={quickEditMode}
 											role="option"
@@ -638,7 +654,7 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 											class:draggable-item={quickEditMode}
 											class:has-changes={pendingChanges.has(node.id)}
 										>
-											<Layer {node} {projectId} {types} {priorities} {epicInfo} viewMode={'columns'} {expandedNodes} standalone={true} on:created={() => loadItems()} />
+											<Layer {node} {projectId} {types} {priorities} {epicInfo} viewMode={'columns'} {expandedNodes} {passkey} standalone={true} on:created={() => loadItems()} />
 										</div>
 									{/each}
 								</div>
@@ -657,6 +673,7 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 						{epicInfo}
 						{viewMode}
 						{expandedNodes}
+						{passkey}
 						standalone={false}
 						on:created={() => loadItems()}
 						on:toggle={(e) => toggleExpand(e.detail)}
@@ -665,7 +682,7 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 			{/if}
 		</div>
 		{#if showSidebar}
-			<ProjectSidebar projectId={projectId} on:changed={() => loadItems()} />
+			<ProjectSidebar projectId={projectId} {passkey} on:changed={() => loadItems()} />
 		{/if}
 	</div>
 
