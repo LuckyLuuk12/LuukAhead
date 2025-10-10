@@ -2,13 +2,14 @@
 	import { onMount } from 'svelte';
 	import Layer from './Layer.svelte';
 	import ProjectSidebar from './ProjectSidebar.svelte';
+	import Filter from './Filter.svelte';
 	export let projectId: string;
 
 	let items: any[] = [];
 	let types: any[] = [];
 	let priorities: any[] = [];
 	let showSidebar: boolean = false; // sidebar hidden by default
-	let viewMode: 'tree' | 'pyramid' | 'columns' = 'pyramid'; // default to pyramid view
+	let viewMode: 'tree' | 'pyramid' | 'columns' = 'tree'; // default to pyramid view
 	let columnGroupBy: 'type' | 'status' | 'priority' = 'type'; // how to group columns
 	let expandedNodes = new Set<string>(); // track which nodes are expanded
 	let previousViewMode: 'tree' | 'pyramid' | 'columns' = viewMode;
@@ -17,6 +18,14 @@
 	let quickEditMode = false;
 	let pendingChanges = new Map<string, any>(); // itemId -> changes
 	let draggedItem: any = null;
+
+	// Filter state
+	let filterConfig = {
+		searchText: '',
+		priorities: [] as string[],
+		types: [] as string[],
+		statuses: [] as string[]
+	};
 
 	// Disable Quick Edit Mode when switching to Type grouping
 	$: if (columnGroupBy === 'type' && quickEditMode) {
@@ -78,6 +87,50 @@
 		await loadItems();
 	});
 
+	function handleFilterChange(event: CustomEvent) {
+		filterConfig = event.detail;
+	}
+
+	// Filter items based on current filter configuration
+	function filterItems(itemsList: any[], config = filterConfig): any[] {
+		return itemsList.filter(item => {
+			// Skip root for filtering
+			if (item.is_root) return true;
+
+			// Search text filter (title, description, remarks)
+			if (config.searchText.trim()) {
+				const searchLower = config.searchText.toLowerCase();
+				const matchesSearch = 
+					item.title?.toLowerCase().includes(searchLower) ||
+					item.description?.toLowerCase().includes(searchLower) ||
+					item.remarks?.toLowerCase().includes(searchLower);
+				if (!matchesSearch) return false;
+			}
+
+			// Status filter
+			if (config.statuses.length > 0) {
+				const itemStatus = item.status || 'todo';
+				if (!config.statuses.includes(itemStatus)) return false;
+			}
+
+			// Type filter
+			if (config.types.length > 0 && item.type_id) {
+				if (!config.types.includes(item.type_id)) return false;
+			}
+
+			// Priority filter
+			if (config.priorities.length > 0 && item.priority_id) {
+				if (!config.priorities.includes(item.priority_id)) return false;
+			}
+
+			return true;
+		});
+	}
+
+	// Apply filters to items before building tree - reactive to both items and filterConfig
+	// We need to reference filterConfig in the reactive statement so Svelte knows to re-run when it changes
+	$: filteredItems = filterItems(items, filterConfig);
+
 	function buildTree(list: any[]) {
 		const map = new Map<string, any>();
 		list.forEach((it) => map.set(it.id, { ...it, children: [] }));
@@ -96,9 +149,9 @@
 
 	let tree: any[] = [];
 
-	// compute tree and set depth per node
+	// compute tree and set depth per node - use filtered items
 	$: {
-		tree = buildTree(items);
+		tree = buildTree(filteredItems);
 		function setDepth(node: any, depth = 0) {
 			node.depth = depth;
 			if (node.children) node.children.forEach((c: any) => setDepth(c, depth + 1));
@@ -145,15 +198,23 @@
 $: columns = (() => {
 	// produce an array of columns based on columnGroupBy mode
 	const cols: any[] = [];
-	if (!items || items.length === 0) return cols;
+	if (!filteredItems || filteredItems.length === 0) return cols;
 
-	// Build a depth map from the already-computed `tree` structure for type-based grouping
+	// Build a depth map from ALL items (not filtered) to maintain correct type mapping
+	// This ensures items keep their original type/depth even when some items are filtered out
+	const allTree = buildTree(items);
+	function setDepthAll(node: any, depth = 0) {
+		node.depth = depth;
+		if (node.children) node.children.forEach((c: any) => setDepthAll(c, depth + 1));
+	}
+	allTree.forEach((r) => setDepthAll(r, 0));
+	
 	const depthMap = new Map<string, number>();
 	function walk(node: any) {
 		depthMap.set(node.id, node.depth ?? 0);
 		if (node.children) node.children.forEach((c: any) => walk(c));
 	}
-	tree.forEach((r) => walk(r));
+	allTree.forEach((r) => walk(r));
 
 	if (columnGroupBy === 'type') {
 		// Group by item type (depth-based)
@@ -161,7 +222,7 @@ $: columns = (() => {
 		for (let i = 0; i < typeCount; i++) cols.push([]);
 		const backlog: any[] = [];
 
-		items.forEach((it) => {
+		filteredItems.forEach((it) => {
 			if (it.is_root) return; // skip root
 			const depth = depthMap.get(it.id) ?? 0;
 			const typeIdx = Math.max(0, depth - 1);
@@ -179,7 +240,7 @@ $: columns = (() => {
 		const statuses = ['todo', 'in_progress', 'review', 'done', 'cancelled'];
 		statuses.forEach(() => cols.push([]));
 
-		items.forEach((it) => {
+		filteredItems.forEach((it) => {
 			if (it.is_root) return; // skip root
 			const depth = depthMap.get(it.id) ?? 0;
 			
@@ -201,7 +262,7 @@ $: columns = (() => {
 		for (let i = 0; i < prioCount; i++) cols.push([]);
 		const backlog: any[] = [];
 
-		items.forEach((it) => {
+		filteredItems.forEach((it) => {
 			if (it.is_root) return; // skip root
 			const depth = depthMap.get(it.id) ?? 0;
 			const node = { ...it, depth };
@@ -250,6 +311,100 @@ $: columnHeaders = (() => {
 	}
 	return [];
 })();
+
+// Get all epics (depth 1 items) with client-side numbering
+// IMPORTANT: Use ALL items (not filtered) to maintain consistent epic numbering
+$: allEpics = (() => {
+	const epicsList: any[] = [];
+	const allTree = buildTree(items); // Build tree from ALL items
+	function setDepthAll(node: any, depth = 0) {
+		node.depth = depth;
+		if (node.children) node.children.forEach((c: any) => setDepthAll(c, depth + 1));
+	}
+	allTree.forEach((r) => setDepthAll(r, 0));
+	
+	items.forEach(item => {
+		const depth = findDepthInTree(item.id, allTree);
+		if (depth === 1) {
+			epicsList.push(item);
+		}
+	});
+	// Sort by creation order (or any stable order)
+	return epicsList.sort((a, b) => a.id.localeCompare(b.id));
+})();
+
+// Get epic info (with number and color) for an item
+// IMPORTANT: Use allEpics (unfiltered) to maintain consistent numbering and colors
+function getEpicForItem(itemId: string): { title: string; number: number; color: string } | null {
+	const item = items.find(it => it.id === itemId); // Check in ALL items
+	if (!item) return null;
+	
+	// Build tree from ALL items to get correct depth
+	const allTree = buildTree(items);
+	function setDepthAll(node: any, depth = 0) {
+		node.depth = depth;
+		if (node.children) node.children.forEach((c: any) => setDepthAll(c, depth + 1));
+	}
+	allTree.forEach((r) => setDepthAll(r, 0));
+	
+	// Traverse up the tree to find the epic (depth 1 item)
+	let current = item;
+	while (current) {
+		const depth = allTree.find(r => r.id === current.id)?.depth ?? 
+		              findDepthInTree(current.id, allTree);
+		
+		if (depth === 1) {
+			const epicIndex = allEpics.findIndex(e => e.id === current.id);
+			const epicNumber = epicIndex + 1;
+			
+			// Get the epic's type color
+			const epicType = types.find(t => t.id === current.type_id);
+			const color = epicType?.color || computeTypeColor(current.type_id);
+			
+			return {
+				title: current.title || 'Untitled Epic',
+				number: epicNumber,
+				color: color
+			};
+		}
+		
+		if (!current.parent_id) break;
+		current = items.find(it => it.id === current.parent_id); // Use ALL items
+	}
+	
+	return null;
+}
+
+function findDepthInTree(itemId: string, nodes: any[], currentDepth = 0): number {
+	for (const node of nodes) {
+		if (node.id === itemId) return currentDepth;
+		if (node.children) {
+			const found = findDepthInTree(itemId, node.children, currentDepth + 1);
+			if (found !== -1) return found;
+		}
+	}
+	return -1;
+}
+
+// Color computation for type badges (same as in other components)
+function hueForIndex(index: number, total: number): number {
+	if (total <= 1) return 270;
+	return 270 - (index / (total - 1)) * 270;
+}
+
+function toHslString(hue: number, saturation: number, lightness: number): string {
+	return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+}
+
+function computeTypeColor(typeId: string | null): string {
+	if (!typeId || !types) return toHslString(270, 70, 60);
+	const type = types.find(t => t.id === typeId);
+	if (type?.color) return type.color;
+	const index = types.findIndex(t => t.id === typeId);
+	if (index === -1) return toHslString(270, 70, 60);
+	const hue = hueForIndex(index, types.length);
+	return toHslString(hue, 70, 60);
+}
 
 // Quick Edit Mode functions
 function toggleQuickEditMode() {
@@ -437,11 +592,13 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 				{#each pyramidLayers as layer, depth}
 					<div class="pyramid-layer" data-depth={depth}>
 						{#each layer as node}
+							{@const epicInfo = getEpicForItem(node.id)}
 							<Layer 
 								{node}
 								{projectId}
 								{types}
 								{priorities}
+								{epicInfo}
 								{viewMode}
 								{expandedNodes}
 								standalone={true}
@@ -465,9 +622,13 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 								on:dragover={handleDragOver}
 								on:drop={(e) => handleDrop(e, idx)}
 							>
-								<div class="column-header">{columnHeaders[idx] ?? `Column ${idx+1}`}</div>
+								<div class="column-header">
+									<span class="header-title">{columnHeaders[idx] ?? `Column ${idx+1}`}</span>
+									<span class="header-count">{col.length}</span>
+								</div>
 								<div class="column-body">
 									{#each col as node}
+										{@const epicInfo = getEpicForItem(node.id)}
 										<div
 											draggable={quickEditMode}
 											role="option"
@@ -477,7 +638,7 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 											class:draggable-item={quickEditMode}
 											class:has-changes={pendingChanges.has(node.id)}
 										>
-											<Layer node={node} {projectId} {types} {priorities} viewMode={'columns'} expandedNodes={expandedNodes} standalone={true} on:created={() => loadItems()} />
+											<Layer {node} {projectId} {types} {priorities} {epicInfo} viewMode={'columns'} {expandedNodes} standalone={true} on:created={() => loadItems()} />
 										</div>
 									{/each}
 								</div>
@@ -487,11 +648,13 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 				{:else}
 					<!-- Tree view: traditional nested -->
 					{#if rootNode}
+					{@const epicInfo = getEpicForItem(rootNode.id)}
 					<Layer 
 						node={rootNode} 
 						{projectId} 
 						{types} 
 						{priorities}
+						{epicInfo}
 						{viewMode}
 						{expandedNodes}
 						standalone={false}
@@ -505,6 +668,9 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 			<ProjectSidebar projectId={projectId} on:changed={() => loadItems()} />
 		{/if}
 	</div>
+
+	<!-- Filter Component -->
+	<Filter {priorities} {types} on:filter={handleFilterChange} />
 </div>
 
 <style>
@@ -704,14 +870,17 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 		align-items: flex-start;
 		padding: 0.5rem;
 		overflow-x: auto;
+		height: 100%;
 	}
 	.column {
 		min-width: 260px;
 		width: 300px;
+		max-height: 100%;
 		background: transparent;
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
+		flex-shrink: 0;
 	}
 	.column-header {
 		font-weight: 700;
@@ -720,6 +889,27 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 		border-radius: 8px;
 		background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
 		border: 1px solid rgba(255,255,255,0.03);
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.header-title {
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.header-count {
+		flex-shrink: 0;
+		padding: 0.125rem 0.5rem;
+		background: var(--dark-700);
+		border-radius: 12px;
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--light-300);
+		min-width: 1.5rem;
+		text-align: center;
 	}
 	.column-body {
 		display: flex;
@@ -727,6 +917,8 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 		gap: 0.75rem;
 		padding: 0.5rem 0.25rem;
 		min-height: 100px;
+		overflow-y: auto;
+		flex: 1;
 	}
 	.column.drop-zone {
 		transition: all 0.2s;
