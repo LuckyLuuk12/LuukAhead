@@ -15,6 +15,13 @@
       "when": 1760033481406,
       "tag": "0001_kind_deathbird",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1760108075041,
+      "tag": "0002_strange_black_queen",
+      "breakpoints": true
     }
   ]
 }

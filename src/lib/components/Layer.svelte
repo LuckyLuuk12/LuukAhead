@@ -173,7 +173,7 @@ function openModalOnKeypress(e: KeyboardEvent) {
 		</div>
 	</div>
 	
-	<WorkItemModal bind:open={modalOpen} item={modalItem} {projectId} {priorities} on:saved={() => { dispatch('created'); modalOpen = false; }} />
+	<WorkItemModal bind:open={modalOpen} item={modalItem} {projectId} {types} {priorities} on:saved={() => { dispatch('created'); modalOpen = false; }} />
 </div>
 
 <style>

@@ -25,7 +25,7 @@ export async function createProject(
 				`INSERT INTO luukahead_project (id, name, owner_id, created_at) VALUES (?, ?, ?, ?)`
 			).bind(projectId, name, ownerId, nowSec),
 			d1.prepare(
-				`INSERT INTO luukahead_work_items (id, project_id, parent_id, type_id, priority_id, title, description, remarks, deadline, owner_id, is_root, completed, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+				`INSERT INTO luukahead_work_items (id, project_id, parent_id, type_id, priority_id, title, description, remarks, deadline, owner_id, is_root, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 			).bind(
 				rootItemId,
 				projectId,
@@ -38,7 +38,7 @@ export async function createProject(
 				null,
 				ownerId,
 				1,
-				0,
+				'todo',
 				nowSec,
 				nowSec
 			)
@@ -86,7 +86,7 @@ export async function createProject(
 			deadline: null,
 			owner_id: ownerId,
 			is_root: 1,
-			completed: 0,
+			status: 'todo',
 			created_at: new Date(),
 			updated_at: new Date()
 		});

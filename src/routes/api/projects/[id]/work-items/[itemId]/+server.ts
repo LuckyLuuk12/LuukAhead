@@ -24,7 +24,7 @@ export const PATCH: RequestHandler = async (event) => {
 		'deadline',
 		'owner_id',
 		'is_root',
-		'completed'
+		'status'
 	];
 	const toUpdate: any = {};
 	for (const k of allowed) if (k in body) toUpdate[k] = (body as any)[k];
