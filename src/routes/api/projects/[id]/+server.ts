@@ -71,7 +71,15 @@ export const DELETE: RequestHandler = async (event) => {
 		const p = projRows.at(0);
 		if (!p || p.ownerId !== user.id) return new Response('Forbidden', { status: 403 });
 
-		// Delete project (will cascade via foreign_keys in sqlite)
+		// Remove dependent rows in the correct order to avoid foreign-key constraint failures
+		// 1) Delete work items for the project (this will cascade to work_item_visibility)
+		await db.delete(schema.work_items).where(eq(schema.work_items.projectId, projectId));
+
+		// 2) Delete item types and priorities scoped to the project
+		await db.delete(schema.item_types).where(eq(schema.item_types.projectId, projectId));
+		await db.delete(schema.priorities).where(eq(schema.priorities.projectId, projectId));
+
+		// 3) Finally delete the project row
 		await db.delete(schema.project).where(eq(schema.project.id, projectId));
 		return new Response(null, { status: 204 });
 	} catch (err) {

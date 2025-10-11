@@ -93,7 +93,9 @@ export async function decryptString(encryptedData: string, passphrase: string): 
 		return decoder.decode(decrypted);
 	} catch (error) {
 		console.error('Decryption failed:', error);
-		throw new Error('Failed to decrypt data. Wrong passkey?');
+		// throw new Error('Failed to decrypt data. Wrong passkey?');
+		// Gracefully handle decryption errors without throwing but just return the original encrypted data
+		return encryptedData;
 	}
 }
 

@@ -1,8 +1,20 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.png';
 	import type { SessionValidationResult } from '$lib/server/auth';
+	import { clearAllPasskeys } from '$lib/stores/passkeys';
 
 	export let user: SessionValidationResult['user'];
+
+	function onLogoutSubmit(e: Event) {
+		try {
+			// clear all passkeys from the client-side store before the logout post
+			clearAllPasskeys();
+		} catch (err) {
+			// don't block logout if clearing fails
+			console.warn('Failed to clear passkeys on logout', err);
+		}
+		// allow the form to submit normally
+	}
 </script>
 
 <nav class="navbar">
@@ -13,7 +25,7 @@
 	<div class="spacer"></div>
 	{#if user}
 		<span class="username">Hi, {user.username}!</span>
-		<form method="POST" action="/logout">
+		<form method="POST" action="/logout" on:submit={onLogoutSubmit}>
 			<button type="submit" class="logout-btn">Logout</button>
 		</form>
 	{:else}

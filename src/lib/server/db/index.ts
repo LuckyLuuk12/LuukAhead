@@ -139,9 +139,9 @@ CREATE TABLE IF NOT EXISTS luukahead_work_items (
 	updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
 	FOREIGN KEY(project_id) REFERENCES luukahead_project(id) ON DELETE CASCADE,
 	FOREIGN KEY(parent_id) REFERENCES luukahead_work_items(id) ON DELETE CASCADE,
-	FOREIGN KEY(type_id) REFERENCES luukahead_item_types(id),
-	FOREIGN KEY(priority_id) REFERENCES luukahead_priorities(id),
-	FOREIGN KEY(owner_id) REFERENCES luukahead_user(id)
+	FOREIGN KEY(type_id) REFERENCES luukahead_item_types(id) ON DELETE SET NULL,
+	FOREIGN KEY(priority_id) REFERENCES luukahead_priorities(id) ON DELETE SET NULL,
+	FOREIGN KEY(owner_id) REFERENCES luukahead_user(id) ON DELETE SET NULL
 );
 `;
 

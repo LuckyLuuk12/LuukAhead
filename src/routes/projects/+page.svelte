@@ -6,10 +6,24 @@
 	let selected: string | null = null;
 	let showProjectsList: boolean = true;
 
-	// Passkey management (stored in memory only, per project)
-	let projectPasskeys = new Map<string, string>(); // projectId -> passkey
+	// Passkey management (stored in client-side store)
+	import { projectPasskeys, setPasskey as storeSetPasskey, clearPasskey as storeClearPasskey, getPasskeySync } from '$lib/stores/passkeys';
 	let passkeyInput = ''; // Input for current project's passkey
+	let currentPasskey = '';
+	let hasPasskey = false;
+
+	// subscribe to store changes to keep currentPasskey/hasPasskey up to date
+	$: projectPasskeys.subscribe((m) => {
+		if (selected) {
+			currentPasskey = m.get(selected) || '';
+			hasPasskey = m.has(selected);
+		} else {
+			currentPasskey = '';
+			hasPasskey = false;
+		}
+	});
 	let showPasskeyWarning = false;
+	let showNewProjectWarning = false;
 	let passkeyError = '';
 
 	// local edit state
@@ -29,14 +43,23 @@
 	}
 
 	async function create() {
+		if (!name.trim()) {
+			alert('Project name cannot be empty');
+			return;
+		}
 		const res = await fetch('/api/projects', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ name })
 		});
 		if (res.ok) {
+			const newProject = await res.json();
+			name = '';
+			// reset name and refresh list; passkeys are set separately via the header control
 			name = '';
 			await load();
+			// Auto-select the new project
+			selected = newProject.id;
 		}
 	}
 
@@ -91,7 +114,7 @@
 			await load();
 			if (selected === id) {
 				selected = null;
-				projectPasskeys.delete(id);
+				storeClearPasskey(id);
 				passkeyInput = '';
 			}
 		} else {
@@ -106,8 +129,7 @@
 			passkeyError = 'Passkey cannot be empty';
 			return;
 		}
-		projectPasskeys.set(selected, passkeyInput);
-		projectPasskeys = projectPasskeys; // trigger reactivity
+		storeSetPasskey(selected, passkeyInput);
 		passkeyError = '';
 		showPasskeyWarning = false;
 	}
@@ -115,23 +137,16 @@
 	// Clear passkey for current project
 	function clearPasskey() {
 		if (!selected) return;
-		projectPasskeys.delete(selected);
-		projectPasskeys = projectPasskeys;
+		storeClearPasskey(selected);
 		passkeyInput = '';
 	}
 
-	// Get passkey for a project (returns empty string if not set)
-	function getPasskey(projectId: string): string {
-		return projectPasskeys.get(projectId) || '';
-	}
-
-	// Check if current project has passkey set
-	$: hasPasskey = selected ? projectPasskeys.has(selected) : false;
-	$: currentPasskey = selected ? getPasskey(selected) : '';
-
 	// Update passkeyInput when project selection changes
 	$: if (selected) {
-		passkeyInput = getPasskey(selected);
+		// When switching projects, clear transient input to avoid accidental reuse
+		passkeyInput = currentPasskey || '';
+		passkeyError = '';
+		showPasskeyWarning = false;
 	}
 
 	onMount(load);
@@ -139,122 +154,146 @@
 
 <div class="projects-page">
 	<div class="page-header">
+		<div class="header-bar">
 			<div class="title-row">
 				<h1>Projects</h1>
 			</div>
-		<div class="header-controls">
-			<div class="create-project">
-				<input bind:value={name} placeholder="New project name" class="input-field" />
-				<button on:click={create} class="btn-primary">+ Create</button>
-			</div>
-			
-			{#if selected}
-				<div class="passkey-section">
-					<div class="passkey-header">
-						<label for="passkey-input" class="passkey-label">
-							🔐 Encryption Passkey
-							<button 
-								class="info-btn" 
-								on:click={() => showPasskeyWarning = !showPasskeyWarning}
-								title="What is this?"
-								type="button"
-							>
-								ⓘ
-							</button>
-						</label>
-						{#if hasPasskey}
-							<span class="passkey-status active">✓ Active</span>
-						{:else}
-							<span class="passkey-status inactive">⚠️ Not Set</span>
-						{/if}
-					</div>
-					<div class="passkey-input-row">
-						<input
-							id="passkey-input"
-							type="password"
-							bind:value={passkeyInput}
-							placeholder="Enter passkey for this project..."
-							class="input-field passkey-input"
-							on:keydown={(e) => { if (e.key === 'Enter') setPasskey(); }}
-						/>
-						<button on:click={setPasskey} class="btn-secondary" title="Set passkey">
-							Set
-						</button>
-						{#if hasPasskey}
-							<button on:click={clearPasskey} class="btn-danger-small" title="Clear passkey">
-								Clear
-							</button>
-						{/if}
-					</div>
-					{#if passkeyError}
-						<div class="passkey-error">{passkeyError}</div>
-					{/if}
-					{#if showPasskeyWarning}
-						<div class="passkey-warning">
-							<strong>⚠️ Important:</strong> Your passkey encrypts all sensitive data (titles, descriptions, remarks) 
-							<strong>before</strong> it's sent to the server. The server cannot read your encrypted data.
-							<br><br>
-							<strong>You MUST remember this passkey!</strong> If you lose it, your data cannot be recovered.
-							<br><br>
-							💡 Tip: Each project can have a different passkey. Leave blank to disable encryption.
+
+			<div class="header-controls">
+				{#if selected}
+					<div class="passkey-section compact">
+						<div class="passkey-header">
+							<label for="passkey-input" class="passkey-label">
+								🔐 Encryption Passkey
+								<button
+									class="info-btn"
+									on:click={() => showPasskeyWarning = !showPasskeyWarning}
+									title="What is this?"
+									type="button"
+								>
+									ⓘ
+								</button>
+							</label>
+							{#if hasPasskey}
+								<span class="passkey-status active">✓ Active</span>
+							{:else}
+								<span class="passkey-status inactive">⚠️ Not Set</span>
+							{/if}
 						</div>
+
+						<div class="passkey-input-row">
+							<input
+								id="passkey-input"
+								type="password"
+								bind:value={passkeyInput}
+								placeholder="Enter passkey for this project..."
+								class="input-field passkey-input"
+								on:keydown={(e) => { if (e.key === 'Enter') setPasskey(); }}
+							/>
+							<button on:click={setPasskey} class="btn-secondary" title="Set passkey">Set</button>
+							{#if hasPasskey}
+								<button on:click={clearPasskey} class="btn-danger-small" title="Clear passkey">Clear</button>
+							{/if}
+						</div>
+
+						{#if passkeyError}
+							<div class="passkey-error">{passkeyError}</div>
+						{/if}
+
+						{#if showPasskeyWarning}
+							<div class="passkey-warning">
+								<strong>⚠️ Important:</strong> Your passkey encrypts all sensitive data (titles, descriptions, remarks)
+								<strong>before</strong> it's sent to the server. The server cannot read your encrypted data.
+								<br /><br />
+								<strong>You MUST remember this passkey!</strong> If you lose it, your data cannot be recovered.
+								<br /><br />
+								💡 Tip: Each project can have a different passkey. Leave blank to disable encryption.
+							</div>
+						{/if}
+					</div>
+				{/if}
+
+				<div class="create-project-box">
+					<div class="create-inputs">
+						<input bind:value={name} placeholder="New project name" class="input-field" />
+						<button
+							class="info-btn-inline"
+							on:click={() => showNewProjectWarning = !showNewProjectWarning}
+							title="What is encryption?"
+							type="button"
+						>
+							ⓘ
+						</button>
+					</div>
+
+					<button on:click={create} class="btn-primary">+ Create</button>
+
+					{#if showNewProjectWarning}
+							<div class="new-project-warning tooltip">
+								<strong>🔐 Client-Side Encryption:</strong>
+								<br />Passkeys are configured per-project using the Encryption Passkey control at the top when a project is selected.
+								<br /><br />
+								<strong>⚠️ You MUST remember any passkey you set!</strong>
+							</div>
 					{/if}
 				</div>
-			{/if}
-		</div>
-	</div>
+			</div> <!-- .header-controls -->
+		</div> <!-- .header-bar -->
+	</div> <!-- .page-header -->
 
-		<div class="projects-container">
-			{#if showProjectsList}
-				<div class="projects-list">
+	<div class="projects-container">
+		{#if showProjectsList}
+			<div class="projects-list">
 				<div class="projects-list-header">
 					<button class="list-collapse-btn" title="Collapse" on:click={() => showProjectsList = false} aria-label="Collapse projects list">
 						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 							<polyline points="15 18 9 12 15 6"></polyline>
 						</svg>
 					</button>
-					<h3>Your Projects</h3>
 				</div>
-			<ul>
-				{#each projects as p}
-					<li class:selected={selected === p.id}>
-						<input
-							value={edits[p.id]}
-							on:input={(e) => edits[p.id] = (e.target as HTMLInputElement).value}
-							on:blur={() => saveName(p.id)}
-							on:keydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-							class="project-name-input"
-						/>
-						<button on:click={() => (selected = p.id)} title="Open" class="btn-open">Open</button>
-						{#if saving[p.id]}
-							<span class="status saving">Saving…</span>
-						{:else if saved[p.id]}
-							<span class="status saved">✓</span>
-						{:else if errorMsg[p.id]}
-							<span class="status error">{errorMsg[p.id]}</span>
-						{/if}
-						<button on:click={() => deleteProject(p.id)} title="Delete project" class="btn-delete">🗑️</button>
-					</li>
-				{/each}
-			</ul>
-				</div>
-			{:else}
-				<div class="projects-collapsed-bar" title="Open projects list" on:click={() => showProjectsList = true} aria-label="Open projects list" on:keypress={(e) => { if (e.key === 'Enter' || e.key === ' ') showProjectsList = true; }} tabindex="0" role="button">
-					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-						<polyline points="9 18 15 12 9 6"></polyline>
-					</svg>
-				</div>
-			{/if}
+				<ul>
+					{#each projects as p}
+						<li class:selected={selected === p.id}>
+							<input
+								value={edits[p.id]}
+								on:input={(e) => edits[p.id] = (e.target as HTMLInputElement).value}
+								on:blur={() => saveName(p.id)}
+								on:keydown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+								class="project-name-input"
+							/>
+							<button on:click={() => (selected = p.id)} title="Open" class="btn-open">Open</button>
+							{#if saving[p.id]}
+								<span class="status saving">Saving…</span>
+							{:else if saved[p.id]}
+								<span class="status saved">✓</span>
+							{:else if errorMsg[p.id]}
+								<span class="status error">{errorMsg[p.id]}</span>
+							{/if}
+							<button on:click={() => deleteProject(p.id)} title="Delete project" class="btn-delete">🗑️</button>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{:else}
+			<div class="projects-collapsed-bar" title="Open projects list" on:click={() => showProjectsList = true} aria-label="Open projects list" on:keypress={(e) => { if (e.key === 'Enter' || e.key === ' ') showProjectsList = true; }} tabindex="0" role="button">
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<polyline points="9 18 15 12 9 6"></polyline>
+				</svg>
+			</div>
+		{/if}
+
 		<div class="project-content">
 			{#if selected}
-				{#if hasPasskey || !passkeyInput}
-					<ProjectViewer projectId={selected} passkey={currentPasskey} />
+				{#if hasPasskey || passkeyInput === ''}
+						{#key `${selected}:${currentPasskey}`}
+						<ProjectViewer projectId={selected} />
+					{/key}
 				{:else}
 					<div class="empty-state passkey-required">
 						<div class="passkey-prompt">
 							<h2>🔐 Passkey Required</h2>
-							<p>Please set a passkey above to view or edit this project.</p>
-							<p class="hint">Or leave it blank if you don't want encryption.</p>
+							<p>You've entered a passkey but haven't set it yet.</p>
+							<p class="hint">Click "Set" to activate encryption, or clear the field to proceed without encryption.</p>
 						</div>
 					</div>
 				{/if}
@@ -275,11 +314,15 @@
 		gap: 1rem;
 	}
 	.page-header {
-		display: flex;
-		flex-direction: column;
-		gap: 1rem;
-		padding-bottom: 1rem;
+		display: block;
+		padding-bottom: 0.5rem;
 		border-bottom: 2px solid var(--primary-500);
+	}
+	.header-bar {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
 	}
 	.page-header h1 {
 		margin: 0;
@@ -291,9 +334,62 @@
 		align-items: flex-start;
 		flex-wrap: wrap;
 	}
-	.create-project {
+	.create-project-box {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		background: var(--container);
+		padding: 0.5rem;
+		border-radius: 8px;
+		border: 1px solid var(--dark-700);
+	}
+	.create-inputs {
 		display: flex;
 		gap: 0.5rem;
+		align-items: center;
+	}
+
+	.info-btn-inline {
+		background: var(--dark-700);
+		border: 1px solid var(--dark-600);
+		border-radius: 50%;
+		width: 28px;
+		height: 28px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer;
+		font-size: 14px;
+		color: var(--primary-400);
+		transition: all 0.2s;
+		padding: 0;
+		flex-shrink: 0;
+	}
+	.info-btn-inline:hover {
+		background: var(--dark-600);
+		border-color: var(--primary-500);
+		color: var(--primary-300);
+	}
+	.new-project-warning {
+		background: var(--dark-800);
+		border: 1px solid var(--primary-500);
+		border-radius: 6px;
+		padding: 0.75rem 1rem;
+		font-size: 0.9rem;
+		color: var(--light-200);
+		line-height: 1.5;
+		max-width: 600px;
+	}
+	.new-project-warning.tooltip {
+		position: absolute;
+		top: 110%;
+		right: 0;
+		z-index: 60;
+		width: 340px;
+		box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+	}
+	.new-project-warning strong {
+		color: var(--primary-400);
 	}
 	.input-field {
 		padding: 0.5rem 1rem;
@@ -346,12 +442,32 @@
 		color: var(--light-50);
 	}
 	.passkey-section {
-		flex: 1;
-		max-width: 600px;
+		/* Match the create-project-box appearance and allow natural sizing */
 		background: var(--container);
-		padding: 1rem;
+		padding: 0.5rem;
 		border-radius: 8px;
 		border: 1px solid var(--dark-700);
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.passkey-section.compact {
+		/* Compact variant inherits same visual style; remove width constraints so it sizes like create box */
+		display: flex;
+		align-items: baseline;
+		gap: 0.5rem;
+		padding: 0.35rem 0.5rem;
+	}
+	.passkey-section.compact .passkey-header {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.passkey-section.compact .passkey-input-row {
+		flex: 0 0 auto;
+		margin-left: 0.5rem;
+		/* allow input to size naturally; keep a reasonable min-width */
+		min-width: 140px;
 	}
 	.passkey-header {
 		display: flex;
@@ -500,11 +616,6 @@
 	.list-collapse-btn:hover {
 		background: var(--dark-700);
 		color: var(--light-100);
-	}
-	.projects-list h3 {
-		margin: 0 0 1rem 0;
-		color: var(--primary-400);
-		font-size: 1.1rem;
 	}
 	.projects-list ul {
 		list-style: none;

@@ -4,9 +4,16 @@
 	import ProjectSidebar from './ProjectSidebar.svelte';
 	import Filter from './Filter.svelte';
 	import { decryptWorkItem, encryptWorkItem } from '$lib/crypto';
-	
+	import { projectPasskeys, getPasskeySync } from '$lib/stores/passkeys';
+
 	export let projectId: string;
-	export let passkey: string = ''; // Encryption passkey (optional)
+
+	// Use the central passkey store instead of a prop
+	let currentPasskey: string = '';
+	const unsubscribe = projectPasskeys.subscribe((m) => {
+		if (projectId) currentPasskey = m.get(projectId) || '';
+		else currentPasskey = '';
+	});
 
 	let items: any[] = [];
 	let types: any[] = [];
@@ -56,9 +63,9 @@
 		const res = await fetch(`/api/projects/${projectId}/work-items`);
 		if (res.ok) {
 			const rawItems = await res.json();
-			// Decrypt items if passkey is provided
-			if (passkey) {
-				items = await Promise.all(rawItems.map((item: any) => decryptWorkItem(item, passkey)));
+			// Decrypt items if a passkey exists in the store for this project
+			if (currentPasskey) {
+				items = await Promise.all(rawItems.map((item: any) => decryptWorkItem(item, currentPasskey)));
 			} else {
 				items = rawItems;
 			}
@@ -92,10 +99,18 @@
 		expandedNodes = expandedNodes; // trigger reactivity
 	}
 
-	onMount(async () => {
-		await Promise.all([loadTypes(), loadPriorities()]);
-		await loadItems();
-	});
+	 onMount(() => {
+	 		// sync passkey for the first render
+	 		currentPasskey = getPasskeySync(projectId);
+
+	 		// perform async loads in an IIFE so onMount returns the cleanup synchronously
+	 		(async () => {
+	 			await Promise.all([loadTypes(), loadPriorities()]);
+	 			await loadItems();
+	 		})();
+
+	 		return () => unsubscribe();
+	 	});
 
 	function handleFilterChange(event: CustomEvent) {
 		filterConfig = event.detail;
@@ -441,9 +456,9 @@ async function confirmChanges() {
 		...changes
 	}));
 
-	// Encrypt each update if passkey is provided
-	if (passkey) {
-		updates = await Promise.all(updates.map(update => encryptWorkItem(update, passkey)));
+	// Encrypt each update if a passkey is provided for this project
+	if (currentPasskey) {
+		updates = await Promise.all(updates.map(update => encryptWorkItem(update, currentPasskey)));
 	}
 
 	try {
@@ -616,7 +631,6 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 								{epicInfo}
 								{viewMode}
 								{expandedNodes}
-								{passkey}
 								standalone={true}
 								on:created={() => loadItems()}
 								on:toggle={(e) => toggleExpand(e.detail)}
@@ -654,7 +668,7 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 											class:draggable-item={quickEditMode}
 											class:has-changes={pendingChanges.has(node.id)}
 										>
-											<Layer {node} {projectId} {types} {priorities} {epicInfo} viewMode={'columns'} {expandedNodes} {passkey} standalone={true} on:created={() => loadItems()} />
+											<Layer {node} {projectId} {types} {priorities} {epicInfo} viewMode={'columns'} {expandedNodes} standalone={true} on:created={() => loadItems()} />
 										</div>
 									{/each}
 								</div>
@@ -673,7 +687,6 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 						{epicInfo}
 						{viewMode}
 						{expandedNodes}
-						{passkey}
 						standalone={false}
 						on:created={() => loadItems()}
 						on:toggle={(e) => toggleExpand(e.detail)}
@@ -682,7 +695,7 @@ function handleDrop(e: DragEvent, columnIndex: number) {
 			{/if}
 		</div>
 		{#if showSidebar}
-			<ProjectSidebar projectId={projectId} {passkey} on:changed={() => loadItems()} />
+			<ProjectSidebar projectId={projectId} on:changed={() => loadItems()} />
 		{/if}
 	</div>
 

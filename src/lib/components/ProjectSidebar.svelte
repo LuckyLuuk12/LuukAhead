@@ -1,7 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher, onMount } from 'svelte';
   export let projectId: string;
-  export let passkey: string = ''; // Encryption passkey (optional)
   const dispatch = createEventDispatcher();
 
   let types: any[] = [];

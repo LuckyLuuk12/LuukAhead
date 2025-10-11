@@ -2,6 +2,7 @@
 	import { createEventDispatcher } from 'svelte';
 	import WorkItemModal from './WorkItemModal.svelte';
 	import { encryptWorkItem } from '$lib/crypto';
+	import { projectPasskeys } from '$lib/stores/passkeys';
 	export let node: any;
 	export let projectId: string;
 	export let types: any[] = [];
@@ -10,7 +11,10 @@
 	export let expandedNodes: Set<string> = new Set();
 	export let standalone: boolean = false; // In pyramid mode, don't render children
 	export let epicInfo: { title: string; number: number; color: string } | null = null; // Epic tag info
-	export let passkey: string = ''; // Encryption passkey (optional)
+
+	// derive current passkey from the store for this project
+	let passkey: string = '';
+	$: projectPasskeys.subscribe((m) => { passkey = projectId ? (m.get(projectId) || '') : ''; });
 	
 	const dispatch = createEventDispatcher();
 	let modalOpen = false;
@@ -80,7 +84,11 @@ function openModalOnKeypress(e: KeyboardEvent) {
 		if (node.is_root) return;
 	const myType = types?.[node.depth - 1];
 	let body: any = { parent_id: node.parent_id ?? null, title: 'New item', type_id: myType?.id ?? null };
-	if (passkey) {
+	// If no passkey is set for this project, warn the user before storing unencrypted data
+	if (!passkey) {
+		const proceed = confirm('No passkey set for this project. The new item will be stored unencrypted on the server. Continue?');
+		if (!proceed) return;
+	} else {
 		body = await encryptWorkItem(body, passkey);
 	}
 	const res = await fetch(`/api/projects/${projectId}/work-items`, {
@@ -93,7 +101,10 @@ function openModalOnKeypress(e: KeyboardEvent) {
 	async function addChild() {
 		const nextType = types?.[node.depth];
 		let body: any = { parent_id: node.id, title: 'New item', type_id: nextType?.id ?? null };
-		if (passkey) {
+		if (!passkey) {
+			const proceed = confirm('No passkey set for this project. The new item will be stored unencrypted on the server. Continue?');
+			if (!proceed) return;
+		} else {
 			body = await encryptWorkItem(body, passkey);
 		}
 		const res = await fetch(`/api/projects/${projectId}/work-items`, {
@@ -112,7 +123,10 @@ function openModalOnKeypress(e: KeyboardEvent) {
 		// only for root: create a child with the first type if available
 		const firstType = types?.[0];
 		let body: any = { parent_id: node.id, title: 'Layer', type_id: firstType?.id ?? null };
-		if (passkey) {
+		if (!passkey) {
+			const proceed = confirm('No passkey set for this project. The new item will be stored unencrypted on the server. Continue?');
+			if (!proceed) return;
+		} else {
 			body = await encryptWorkItem(body, passkey);
 		}
 		const res = await fetch(`/api/projects/${projectId}/work-items`, {
@@ -126,7 +140,10 @@ function openModalOnKeypress(e: KeyboardEvent) {
 		const nextType = types?.[node.depth + 1];
 		if (!nextType) return;
 		let body: any = { parent_id: node.id, title: 'Layer', type_id: nextType.id };
-		if (passkey) {
+		if (!passkey) {
+			const proceed = confirm('No passkey set for this project. The new item will be stored unencrypted on the server. Continue?');
+			if (!proceed) return;
+		} else {
 			body = await encryptWorkItem(body, passkey);
 		}
 		const res = await fetch(`/api/projects/${projectId}/work-items`, {
@@ -256,14 +273,14 @@ function openModalOnKeypress(e: KeyboardEvent) {
 			{#if showChildren && node.children?.length}
 				<div class="children-container">
 					{#each node.children as child}
-						<svelte:self node={child} {projectId} {types} {priorities} epicInfo={null} {viewMode} {expandedNodes} {standalone} {passkey} on:created on:toggle />
+						<svelte:self node={child} {projectId} {types} {priorities} epicInfo={null} {viewMode} {expandedNodes} {standalone} on:created on:toggle />
 					{/each}
 				</div>
 			{/if}
 		</div>
 	</div>
 	
-	<WorkItemModal bind:open={modalOpen} item={modalItem} {projectId} {types} {priorities} {passkey} on:saved={() => { dispatch('created'); modalOpen = false; }} />
+	<WorkItemModal bind:open={modalOpen} item={modalItem} {projectId} {types} {priorities} on:saved={() => { dispatch('created'); modalOpen = false; }} />
 </div>
 
 <style>

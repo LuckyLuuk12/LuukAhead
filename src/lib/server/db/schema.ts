@@ -68,13 +68,13 @@ export const work_items = sqliteTable(`${table_prefix}work_items`, {
     id: text('id').primaryKey(),
     projectId: text('project_id').notNull().references(() => project.id as any),
     parent_id: text('parent_id').references(((): any => work_items.id), { onDelete: 'cascade' }),
-    type_id: text('type_id').references(() => item_types.id as any),
-    priority_id: text('priority_id').references(() => priorities.id as any),
+    type_id: text('type_id').references(() => item_types.id as any, { onDelete: 'set null' }),
+    priority_id: text('priority_id').references(() => priorities.id as any, { onDelete: 'set null' }),
     title: text('title').notNull(),
     description: text('description'),
     remarks: text('remarks'),
     deadline: integer('deadline', { mode: 'timestamp' }),
-    owner_id: text('owner_id').references(() => user.id as any),
+    owner_id: text('owner_id').references(() => user.id as any, { onDelete: 'set null' }),
     // mark an item as the root item for a project (0/1 stored as integer)
     is_root: integer('is_root').default(0),
     // status enum: todo, in_progress, review, done, cancelled

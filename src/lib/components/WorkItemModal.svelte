@@ -7,7 +7,10 @@
   export let projectId: string;
   export let priorities: any[] = [];
   export let types: any[] = [];
-  export let passkey: string = ''; // Encryption passkey (optional)
+
+  import { projectPasskeys } from '$lib/stores/passkeys';
+  let passkey = '';
+  $: projectPasskeys.subscribe((m) => { passkey = projectId ? (m.get(projectId) || '') : ''; });
   const dispatch = createEventDispatcher();
 
   let dlg: HTMLDialogElement | null = null;
@@ -94,7 +97,10 @@ function escapeHtml(str: string) {
     if (deadlineStr) body.deadline = Math.floor(new Date(deadlineStr).getTime() / 1000);
 
     // Encrypt sensitive fields if passkey is provided
-    if (passkey) {
+    if (!passkey) {
+      const proceed = confirm('No passkey set for this project. This save will store title/description/remarks unencrypted on the server. Continue?');
+      if (!proceed) return;
+    } else {
       body = await encryptWorkItem(body, passkey);
     }
 
