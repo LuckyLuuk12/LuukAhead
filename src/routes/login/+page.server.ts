@@ -56,8 +56,16 @@ export const load: PageServerLoad = async (event) => {
 		event.platform?.env?.GOOGLE_REDIRECT_URI
 	);
 	
+	// Check if Microsoft OAuth is configured
+	const microsoftOAuthEnabled = !!(
+		event.platform?.env?.MICROSOFT_CLIENT_ID &&
+		event.platform?.env?.MICROSOFT_CLIENT_SECRET &&
+		event.platform?.env?.MICROSOFT_REDIRECT_URI
+	);
+	
 	return {
-		googleOAuthEnabled
+		googleOAuthEnabled,
+		microsoftOAuthEnabled
 	};
 };
 

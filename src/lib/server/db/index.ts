@@ -76,7 +76,9 @@ CREATE TABLE IF NOT EXISTS luukahead_user (
 	id TEXT PRIMARY KEY,
 	age INTEGER,
 	username TEXT NOT NULL UNIQUE,
-	password_hash TEXT NOT NULL
+	password_hash TEXT,
+	google_id TEXT UNIQUE,
+	microsoft_id TEXT UNIQUE
 );
 `;
 
