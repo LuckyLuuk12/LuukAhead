@@ -15,6 +15,13 @@ database_name = "kablan_db"
 database_id = "01ca3af7-978a-4258-9ad1-37ae8f060510"
 migrations_dir = "./drizzle"
 
+# Environment variables (non-secret values)
+[vars]
+GOOGLE_CLIENT_ID = "your-client-id"
+GOOGLE_REDIRECT_URI = "http://luukahead.kablan.nl/login/google/callback"
+MICROSOFT_CLIENT_ID = "e393ab40-63b6-4ce3-9058-867b937662c5"
+MICROSOFT_REDIRECT_URI = "http://luukahead.kablan.nl/login/microsoft/callback"
+
 # Enables Logging for the worker
 [observability]
 enabled = true
