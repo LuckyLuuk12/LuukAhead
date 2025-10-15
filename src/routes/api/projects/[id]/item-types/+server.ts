@@ -3,7 +3,7 @@ import { error } from '@sveltejs/kit';
 import { validateSessionToken } from '$lib/server/auth';
 import { database } from '$lib/server/db';
 import * as schema from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, asc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
 export const GET: RequestHandler = async (event) => {
@@ -21,7 +21,8 @@ export const GET: RequestHandler = async (event) => {
 		const rows = await db
 			.select()
 			.from(schema.item_types)
-			.where(eq(schema.item_types.projectId, projectId));
+			.where(eq(schema.item_types.projectId, projectId))
+			.orderBy(asc(schema.item_types.order));
 		return new Response(JSON.stringify(rows));
 	} catch (err) {
 		console.error('Database error in GET /api/projects/[id]/item-types:', err);
